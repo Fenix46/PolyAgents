@@ -1,0 +1,33 @@
+# FastAPI and web server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Google Gemini AI
+google-generativeai==0.3.2
+
+# Database and storage
+redis[hiredis]==5.0.1
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+psycopg2-binary==2.9.9
+
+# Vector database (optional)
+qdrant-client==1.7.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Code quality
+ruff==0.1.6
+black==23.11.0
+mypy==1.7.1
+
+# Type stubs
+types-redis==4.6.0.11
+
+# Additional utilities
+python-dotenv==1.0.0 
