@@ -14,7 +14,7 @@ sqlalchemy[asyncio]==2.0.23
 psycopg2-binary==2.9.9
 
 # Vector database (optional)
-qdrant-client==1.7.0
+qdrant-client==1.6.9
 
 # Testing
 pytest==7.4.3
@@ -30,4 +30,23 @@ mypy==1.7.1
 types-redis==4.6.0.11
 
 # Additional utilities
-python-dotenv==1.0.0 
+python-dotenv==1.0.0
+
+# AI/ML
+transformers==4.36.2
+sentence-transformers==2.2.2
+
+# Security and authentication
+cryptography==41.0.8
+pyjwt==2.8.0
+bcrypt==4.1.2
+passlib[bcrypt]==1.7.4
+
+# HTTP client and networking
+aiohttp==3.9.1
+
+# System monitoring
+psutil==5.9.6
+
+# Utilities
+python-multipart==0.0.6 

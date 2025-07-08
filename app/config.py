@@ -57,6 +57,37 @@ class Settings(BaseSettings):
     qdrant_port: int = Field(default=6333, description="Qdrant port")
     qdrant_vector_size: int = Field(default=384, description="Vector embedding size")
     
+    # Security Settings
+    jwt_secret_key: Optional[str] = Field(default=None, description="JWT secret key for token signing")
+    api_key_enabled: bool = Field(default=True, description="Enable API key authentication")
+    rate_limiting_enabled: bool = Field(default=True, description="Enable rate limiting")
+    rate_limit_requests: int = Field(default=100, description="Rate limit requests per window")
+    rate_limit_window: int = Field(default=3600, description="Rate limit window in seconds")
+    rate_limit_burst: int = Field(default=10, description="Rate limit burst allowance")
+    
+    # Default API Keys (JSON string)
+    default_api_keys: Optional[str] = Field(
+        default=None,
+        description="JSON configuration for default API keys"
+    )
+    
+    # CORS Settings
+    cors_origins: List[str] = Field(default=["*"], description="CORS allowed origins")
+    cors_allow_credentials: bool = Field(default=True, description="CORS allow credentials")
+    cors_allow_methods: List[str] = Field(default=["*"], description="CORS allowed methods")
+    cors_allow_headers: List[str] = Field(default=["*"], description="CORS allowed headers")
+    
+    # Health Check Settings
+    health_check_timeout: float = Field(default=5.0, description="Health check timeout in seconds")
+    health_check_external_services: bool = Field(default=True, description="Include external service checks in health")
+    
+    # Error Handling Settings
+    retry_max_attempts: int = Field(default=3, description="Maximum retry attempts for failed operations")
+    retry_base_delay: float = Field(default=1.0, description="Base delay for exponential backoff")
+    retry_max_delay: float = Field(default=60.0, description="Maximum delay for exponential backoff")
+    circuit_breaker_failure_threshold: int = Field(default=5, description="Circuit breaker failure threshold")
+    circuit_breaker_timeout: float = Field(default=60.0, description="Circuit breaker timeout in seconds")
+    
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
     
@@ -78,6 +109,29 @@ class Settings(BaseSettings):
             return v
         except json.JSONDecodeError:
             raise ValueError("agent_models_config must be valid JSON")
+    
+    @validator('default_api_keys')
+    def validate_default_api_keys(cls, v):
+        """Validate the JSON configuration for default API keys."""
+        if v is None:
+            return v
+        try:
+            config = json.loads(v)
+            if not isinstance(config, list):
+                raise ValueError("default_api_keys must be a JSON list")
+            for item in config:
+                if not isinstance(item, dict) or 'name' not in item:
+                    raise ValueError("Each API key config must have 'name' field")
+            return v
+        except json.JSONDecodeError:
+            raise ValueError("default_api_keys must be valid JSON")
+    
+    @validator('cors_origins')
+    def validate_cors_origins(cls, v):
+        """Validate CORS origins."""
+        if not v:
+            return ["*"]
+        return v
     
     def get_agent_configs(self) -> List[AgentModelConfig]:
         """Get parsed agent model configurations."""
@@ -122,6 +176,16 @@ class Settings(BaseSettings):
             if config.agent_id == agent_id:
                 return config.temperature
         return self.gemini_temperature  # fallback
+    
+    def get_default_api_keys(self) -> List[Dict]:
+        """Get parsed default API keys configuration."""
+        if not self.default_api_keys:
+            return []
+        
+        try:
+            return json.loads(self.default_api_keys)
+        except json.JSONDecodeError:
+            return []
     
     class Config:
         env_file = ".env"

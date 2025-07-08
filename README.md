@@ -1,299 +1,649 @@
-# Poly-Agents Gemini System
+# PolyAgents - Multi-Agent Gemini System
 
-A production-ready, containerized multi-agent system that runs multiple Google Gemini agents in parallel, facilitates debate through Redis Streams, reaches consensus, and returns unified answers via a FastAPI gateway.
+A sophisticated multi-agent system with consensus mechanism using Google Gemini API, featuring real-time streaming, advanced security, comprehensive health monitoring, and robust error handling.
 
-## 🏗️ Architecture
+## 🚀 Features
 
-- **Gateway**: FastAPI server exposing REST API and WebSocket endpoints
-- **Orchestrator**: Coordinates multiple agents and manages conversation flow
-- **Agents**: Thin wrappers around Google Gemini models with distinct personalities
-- **Consensus Engine**: Pluggable algorithms for reaching agreement (majority vote with tie-breaking)
-- **Memory Layer**: 
-  - Redis Streams for real-time inter-agent communication
-  - PostgreSQL for audit logging and conversation persistence
-  - Qdrant for semantic similarity and long-term memory (optional)
+### Core Features
+- **Multi-Agent Conversations**: Orchestrates multiple Gemini agents with different models/temperatures
+- **Consensus Mechanism**: Majority vote with tie-breaking for reliable decision making
+- **Real-time Streaming**: WebSocket support for live conversation updates
+- **Memory Layer**: Redis Streams for inter-agent communication + PostgreSQL for persistence
+- **Vector Search**: Optional Qdrant integration for semantic search capabilities
 
-## 🚀 Quick Start
+### Security & Authentication
+- **API Key Authentication**: Secure access control with configurable permissions
+- **Rate Limiting**: Burst-aware rate limiting with per-client tracking
+- **JWT Token Support**: Stateless authentication with configurable expiration
+- **Input Validation**: Comprehensive sanitization and validation
+- **IP Blocking**: Automatic blocking of malicious IPs
+- **CORS Configuration**: Flexible cross-origin resource sharing settings
 
-### Prerequisites
+### Monitoring & Observability
+- **Advanced Health Checks**: Component-level monitoring with response times
+- **System Metrics**: Real-time statistics for conversations, agents, and errors
+- **Circuit Breaker Pattern**: Automatic fault tolerance for external services
+- **Error Tracking**: Detailed error logging with contextual information
+- **Performance Monitoring**: Response time tracking and bottleneck identification
 
-- Docker and Docker Compose
+### Resilience & Reliability
+- **Retry Logic**: Exponential backoff with jitter for failed operations
+- **Graceful Degradation**: Fallback responses when services are unavailable
+- **Connection Pooling**: Efficient resource management for databases
+- **Background Tasks**: Automatic cleanup and maintenance operations
+- **Service Discovery**: Health-aware service routing and load balancing
+
+## 📋 Requirements
+
+- Python 3.8+
 - Google Gemini API key
-- Python ≥3.11 (for local development)
+- Redis 6.0+
+- PostgreSQL 12+
+- Qdrant (optional)
 
-### Using Docker Compose (Recommended)
+## 🔧 Installation
 
-1. **Clone and setup**:
-   ```bash
-   git clone <your-repo>
-   cd polyagents-gemini
-   cp env.example .env
-   ```
-
-2. **Configure environment**:
-   Edit `.env` and set your Gemini API key:
-   ```bash
-   GEMINI_API_KEY=your_actual_api_key_here
-   ```
-
-3. **Start the system**:
-   ```bash
-   make dev-up
-   # or manually:
-   docker-compose up -d
-   ```
-
-4. **Test the API**:
-   ```bash
-   curl -X POST "http://localhost:8000/chat" \
-        -H "Content-Type: application/json" \
-        -d '{"prompt": "What are the pros and cons of renewable energy?"}'
-   ```
-
-### Local Development
-
-1. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Start infrastructure**:
-   ```bash
-   docker-compose up redis postgres qdrant -d
-   ```
-
-3. **Run the API**:
-   ```bash
-   python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-   ```
-
-## 📡 API Endpoints
-
-### POST /chat
-Submit a prompt for multi-agent discussion and consensus.
-
-**Request**:
-```json
-{
-  "prompt": "What is the best approach to climate change?"
-}
+### 1. Clone the repository
+```bash
+git clone <repository-url>
+cd PolyAgents-main
 ```
 
-**Response**:
-```json
-{
-  "conversation_id": "uuid-here",
-  "answer": "Consensus response from all agents..."
-}
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
 ```
 
-### WebSocket /stream
-Real-time conversation updates (TODO: implementation pending).
+### 3. Configure environment
+```bash
+cp env.example .env
+# Edit .env with your configurations
+```
 
-### GET /health
-Health check endpoint.
+### 4. Set up infrastructure
 
-## 🔧 Configuration
+#### Using Docker Compose (Recommended)
+```bash
+docker-compose up -d
+```
 
-All configuration is managed via environment variables. See `env.example` for the complete list.
+#### Manual Setup
+```bash
+# Redis
+redis-server
 
-### Core Settings
+# PostgreSQL
+createdb polyagents
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GEMINI_API_KEY` | - | **Required**: Your Google Gemini API key |
-| `NUM_AGENTS` | 3 | Number of agents to spawn (used only if no custom config) |
-| `DEFAULT_TURNS` | 2 | Default conversation turns |
-| `GEMINI_MODEL` | gemini-pro | Default Gemini model (fallback) |
+# Qdrant (optional)
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+### 5. Run the application
+```bash
+python -m app.main
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+#### Core Settings
+```env
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=false
+LOG_LEVEL=INFO
+
+# Agent Configuration
+NUM_AGENTS=3
+DEFAULT_TURNS=2
+
+# Gemini API
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-pro
+GEMINI_TEMPERATURE=0.7
+```
+
+#### Security Settings
+```env
+# Authentication
+JWT_SECRET_KEY=your_very_secure_secret_key_here
+API_KEY_ENABLED=true
+
+# Rate Limiting
+RATE_LIMITING_ENABLED=true
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=3600
+RATE_LIMIT_BURST=10
+
+# Default API Keys (JSON)
+DEFAULT_API_KEYS=[
+  {
+    "name": "admin_user",
+    "key": "pk_admin_1234567890abcdef",
+    "permissions": ["read", "write", "admin"],
+    "rate_limit_override": 1000
+  }
+]
+```
+
+#### Error Handling & Resilience
+```env
+# Retry Configuration
+RETRY_MAX_ATTEMPTS=3
+RETRY_BASE_DELAY=1.0
+RETRY_MAX_DELAY=60.0
+
+# Circuit Breaker
+CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+CIRCUIT_BREAKER_TIMEOUT=60.0
+
+# Health Checks
+HEALTH_CHECK_TIMEOUT=5.0
+HEALTH_CHECK_EXTERNAL_SERVICES=true
+```
 
 ### Multi-Model Configuration
 
-You can configure each agent with different models, temperatures, and personalities using the `AGENT_MODELS_CONFIG` JSON variable:
+Configure different models per agent:
 
-```bash
-AGENT_MODELS_CONFIG='[
+```env
+AGENT_MODELS_CONFIG=[
   {
     "agent_id": "agent_0",
-    "model": "gemini-pro", 
+    "model": "gemini-pro",
     "temperature": 0.3,
-    "personality": "You are a conservative analyst focused on facts."
+    "personality": "analytical"
   },
   {
-    "agent_id": "agent_1",
+    "agent_id": "agent_1", 
     "model": "gemini-pro-vision",
-    "temperature": 0.9, 
-    "personality": "You are a creative visionary with innovative ideas."
+    "temperature": 0.8,
+    "personality": "creative"
   },
   {
     "agent_id": "agent_2",
-    "model": "gemini-ultra",
+    "model": "gemini-pro",
     "temperature": 0.5,
-    "personality": "You are a critical thinker who challenges assumptions."
+    "personality": "critical"
   }
-]'
+]
 ```
 
-**Available Gemini Models**:
-- `gemini-pro` - Standard text model
-- `gemini-pro-vision` - Multimodal model (text + images)
-- `gemini-ultra` - Most capable model (when available)
+## 🌐 API Endpoints
 
-**Configuration Fields**:
-- `agent_id`: Unique identifier (e.g., "agent_0", "specialist_1")  
-- `model`: Gemini model name
-- `temperature`: Creativity level (0.0-1.0)
-- `personality`: Custom personality prompt (optional)
+### Authentication
+All protected endpoints require an API key in the Authorization header:
+```bash
+Authorization: Bearer your_api_key_here
+```
 
-If `AGENT_MODELS_CONFIG` is not set, the system creates `NUM_AGENTS` agents using the default `GEMINI_MODEL`.
+### Chat Endpoints
 
-### Infrastructure Settings
+#### POST /chat
+Start a conversation with multiple agents.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REDIS_HOST` | localhost | Redis host |
-| `REDIS_PORT` | 6379 | Redis port |
-| `POSTGRES_HOST` | localhost | PostgreSQL host |
-| `POSTGRES_USER` | postgres | PostgreSQL username |
-| `POSTGRES_PASSWORD` | password | PostgreSQL password |
-| `QDRANT_HOST` | localhost | Qdrant host (optional) |
+**Request:**
+```json
+{
+  "message": "What are the benefits of renewable energy?",
+  "conversation_id": "optional-uuid",
+  "num_agents": 3,
+  "turns": 2
+}
+```
+
+**Response:**
+```json
+{
+  "conversation_id": "uuid",
+  "agent_responses": [
+    {
+      "agent_id": "agent_0",
+      "response": "Renewable energy reduces carbon emissions...",
+      "model": "gemini-pro",
+      "temperature": 0.3
+    }
+  ],
+  "consensus_result": "Final consensus response",
+  "metadata": {
+    "status": "completed",
+    "duration": 2.5,
+    "turns_completed": 2
+  }
+}
+```
+
+#### POST /stream/{conversation_id}
+Start a streaming conversation.
+
+**Response:**
+```json
+{
+  "conversation_id": "uuid",
+  "status": "started",
+  "websocket_url": "/ws/uuid"
+}
+```
+
+### Real-time WebSocket
+
+#### WS /ws/{conversation_id}
+Connect to real-time conversation updates.
+
+**Messages:**
+```json
+{
+  "type": "agent_response",
+  "agent_id": "agent_0",
+  "content": "Agent response...",
+  "turn": 1,
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+
+{
+  "type": "consensus_update",
+  "consensus": "Current consensus state...",
+  "confidence": 0.85,
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+### Health & Monitoring
+
+#### GET /health
+Basic health check (no authentication required).
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "polyagents"
+}
+```
+
+#### GET /health/detailed
+Comprehensive health check with component status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "components": {
+    "redis": {
+      "status": "healthy",
+      "response_time_ms": 50.2,
+      "details": {
+        "memory_usage_bytes": 1048576,
+        "connected_clients": 5
+      }
+    },
+    "postgresql": {
+      "status": "healthy",
+      "response_time_ms": 120.5,
+      "details": {
+        "database_size_bytes": 52428800,
+        "active_connections": 3
+      }
+    },
+    "gemini_api": {
+      "status": "healthy",
+      "response_time_ms": 300.1,
+      "details": {
+        "available_models": 10,
+        "api_key_configured": true
+      }
+    }
+  },
+  "summary": {
+    "total_components": 7,
+    "healthy": 6,
+    "degraded": 1,
+    "unhealthy": 0
+  }
+}
+```
+
+### Conversation Management
+
+#### GET /conversations/recent
+Get recent conversations.
+
+**Query Parameters:**
+- `limit`: Number of conversations (default: 10)
+
+#### GET /conversations/{conversation_id}
+Get conversation details and messages.
+
+#### POST /conversations/search
+Search conversations by content.
+
+**Request:**
+```json
+{
+  "query": "renewable energy",
+  "limit": 10
+}
+```
+
+### Statistics & Analytics
+
+#### GET /statistics
+Get comprehensive system statistics.
+
+**Response:**
+```json
+{
+  "conversations": {
+    "total_conversations": 1250,
+    "conversations_today": 45,
+    "average_duration": 3.2,
+    "success_rate": 0.96
+  },
+  "agents": {
+    "total_messages": 8750,
+    "average_response_time": 1.8,
+    "model_distribution": {
+      "gemini-pro": 0.7,
+      "gemini-pro-vision": 0.3
+    }
+  },
+  "errors": {
+    "chat_conversation": {
+      "total_24h": 12,
+      "rate_1h": 0.5
+    }
+  },
+  "circuit_breakers": {
+    "gemini_api": {
+      "state": "closed",
+      "failure_count": 0,
+      "last_failure_time": null
+    }
+  }
+}
+```
+
+### Administration
+
+#### POST /admin/cleanup
+Clean up old data (requires admin permission).
+
+**Query Parameters:**
+- `days`: Retention period (default: 30)
+
+**Response:**
+```json
+{
+  "cleanup_results": {
+    "postgresql": {
+      "conversations": 25,
+      "messages": 150
+    },
+    "redis": {
+      "deleted_streams": 8
+    }
+  },
+  "days_threshold": 30
+}
+```
+
+#### GET /admin/export
+Export conversation data (requires admin permission).
+
+**Query Parameters:**
+- `format`: Export format (json)
+- `days`: Export period (default: 7)
+
+## 🔒 Security Features
+
+### API Key Management
+- Configurable permissions: `read`, `write`, `admin`
+- Per-key rate limiting overrides
+- Automatic key rotation support
+- Secure key generation utilities
+
+### Rate Limiting
+- Token bucket algorithm with burst capacity
+- Per-client tracking with Redis backend
+- Configurable limits per endpoint
+- IP-based blocking for abuse prevention
+
+### Input Validation
+- Comprehensive sanitization of all inputs
+- SQL injection prevention
+- XSS protection
+- File upload security (when applicable)
+
+### Monitoring & Alerting
+- Real-time security event logging
+- Failed authentication tracking
+- Rate limit violation alerts
+- Suspicious activity detection
+
+## 🏥 Health Monitoring
+
+### Component Health Checks
+- **Redis**: Connection, memory usage, client count
+- **PostgreSQL**: Connection, database size, active queries
+- **Qdrant**: Collection status, vector count
+- **Gemini API**: Model availability, quota status
+- **System Resources**: Memory, disk space, CPU usage
+
+### Health Status Levels
+- **Healthy**: All systems operational
+- **Degraded**: Minor issues, partial functionality
+- **Unhealthy**: Critical issues, service impacted
+- **Unknown**: Unable to determine status
+
+### Automatic Recovery
+- Circuit breakers for external services
+- Graceful degradation with fallback responses
+- Automatic retry with exponential backoff
+- Health-based load balancing
+
+## 🔄 Error Handling & Resilience
+
+### Retry Logic
+- Exponential backoff with jitter
+- Configurable retry attempts and delays
+- Smart exception classification
+- Retry statistics and monitoring
+
+### Circuit Breaker Pattern
+- Automatic failure detection
+- Configurable failure thresholds
+- Half-open state for recovery testing
+- Service-specific breaker instances
+
+### Graceful Degradation
+- Cached response fallbacks
+- Minimal functionality modes
+- User-friendly error messages
+- Service availability indicators
+
+## 📊 Monitoring & Analytics
+
+### Key Metrics
+- **Response Time**: P50, P95, P99 percentiles
+- **Error Rate**: Errors per hour, success rate
+- **Throughput**: Requests per second
+- **Resource Usage**: Memory, CPU, connections
+
+### Error Tracking
+- Error classification and trending
+- Stack trace collection
+- Performance impact analysis
+- Automated alerting thresholds
+
+### Performance Optimization
+- Database query optimization
+- Connection pool tuning
+- Cache hit rate monitoring
+- Resource bottleneck identification
+
+## 🐳 Docker Deployment
+
+### Development
+```bash
+docker-compose up -d
+```
+
+### Production
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Environment-specific Overrides
+```yaml
+# docker-compose.override.yml
+version: '3.8'
+services:
+  app:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - RATE_LIMITING_ENABLED=false
+```
 
 ## 🧪 Testing
 
-Run the test suite:
-
+### Run All Tests
 ```bash
-# All tests
 pytest
-
-# Unit tests only (exclude integration tests)
-pytest -m "not integration"
-
-# With coverage
-pytest --cov=app --cov-report=html
-
-# Specific test file
-pytest tests/test_gateway.py -v
 ```
 
-## 🛠️ Development Tools
-
-The project includes comprehensive tooling:
-
+### Run Specific Test Categories
 ```bash
-# Code formatting
-black app/ tests/
+# Unit tests
+pytest tests/test_gateway.py::TestAuthentication
 
+# Integration tests
+pytest tests/test_orchestrator.py::TestIntegration
+
+# Security tests
+pytest tests/test_security.py
+```
+
+### Test Coverage
+```bash
+pytest --cov=app --cov-report=html
+```
+
+## 🔧 Development
+
+### Pre-commit Hooks
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### Code Quality
+```bash
 # Linting
-ruff check app/ tests/
+flake8 app/
+black app/
+isort app/
 
 # Type checking
 mypy app/
-
-# Run all quality checks
-make lint
 ```
 
-## 🐳 Docker Commands
-
-Common Docker operations:
-
+### Performance Profiling
 ```bash
-# Start all services
-make dev-up
+# Memory profiling
+python -m memory_profiler app/main.py
 
-# View logs
-docker-compose logs -f api
-
-# Rebuild and restart API
-docker-compose up --build -d api
-
-# Stop all services
-docker-compose down
-
-# Clean up volumes
-docker-compose down -v
+# Performance profiling
+python -m cProfile -o profile.stats app/main.py
 ```
 
-## 🔍 How It Works
+## 📈 Performance Tuning
 
-1. **User submits prompt** via POST /chat
-2. **Orchestrator spawns N agents** with configured models and personalities
-3. **Agents debate in parallel** for N turns (default: 2):
-   - Each agent uses its specific Gemini model and temperature
-   - Responses stored in Redis Streams
-   - All messages logged to PostgreSQL
-4. **Consensus engine** applies majority vote:
-   - Vote on first line of final responses
-   - Tie-breaker: longest response wins
-   - Fallback: alphabetical ordering
-5. **System returns unified answer** with conversation ID
+### Database Optimization
+- Connection pooling configuration
+- Query optimization and indexing
+- Read replicas for analytics
+- Automated vacuum and statistics
 
-### Example Multi-Model Debate
+### Redis Optimization
+- Memory usage optimization
+- Persistence configuration
+- Clustering for high availability
+- Stream compaction policies
 
-With different models configured:
-- **Agent 0** (gemini-pro, temp=0.3): Provides factual, conservative analysis
-- **Agent 1** (gemini-pro-vision, temp=0.9): Offers creative, innovative solutions
-- **Agent 2** (gemini-ultra, temp=0.5): Delivers balanced critical assessment
+### Application Optimization
+- Async/await best practices
+- Connection reuse patterns
+- Caching strategies
+- Resource pool management
 
-This creates richer debates with diverse perspectives and reasoning styles.
+## 🚨 Troubleshooting
 
-## 📊 Monitoring and Observability
+### Common Issues
 
-- **Health checks**: Built into Docker containers
-- **Structured logging**: JSON logs with correlation IDs
-- **Database audit trail**: All conversations and messages persisted
-- **Model tracking**: Each message includes agent model information
-- **Metrics**: Ready for Prometheus integration (TODO)
+#### High Response Times
+1. Check database connection pool
+2. Monitor Redis memory usage
+3. Verify Gemini API quotas
+4. Review error logs for patterns
 
-## 🔮 Future Enhancements
+#### Authentication Failures
+1. Verify API key configuration
+2. Check rate limiting status
+3. Review CORS settings
+4. Validate JWT secret key
 
-- [ ] WebSocket streaming for real-time agent debates
-- [ ] Ray integration for CPU-bound consensus algorithms
-- [ ] Semantic consensus using vector similarity
-- [ ] Agent performance scoring and adaptive weighting
-- [ ] Dynamic model selection based on conversation context
-- [ ] Cross-model conversation analysis and insights
-- [ ] Advanced memory retrieval using Qdrant
+#### WebSocket Connection Issues
+1. Check Redis connectivity
+2. Verify firewall settings
+3. Monitor connection limits
+4. Review proxy configuration
+
+### Debugging Tools
+```bash
+# Health check debugging
+curl -X GET "http://localhost:8000/health/detailed"
+
+# Redis inspection
+redis-cli monitor
+
+# PostgreSQL query analysis
+EXPLAIN ANALYZE <query>
+
+# Application logs
+tail -f logs/polyagents.log
+```
+
+## 📚 API Documentation
+
+Interactive API documentation is available at:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Run tests and quality checks
-4. Submit a pull request
+3. Implement changes with tests
+4. Update documentation
+5. Submit a pull request
 
-## 📝 License
+## 📄 License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Troubleshooting
+## 🙋‍♂️ Support
 
-### Common Issues
+For issues and questions:
+1. Check the troubleshooting guide
+2. Review existing GitHub issues
+3. Create a new issue with detailed information
+4. Include logs and configuration details
 
-**"Gemini API key not found"**
-- Ensure `GEMINI_API_KEY` is set in your `.env` file
-- Verify the API key is valid and has proper permissions
+---
 
-**"Invalid JSON in AGENT_MODELS_CONFIG"**
-- Check JSON syntax is valid
-- Ensure each agent config has required `agent_id` and `model` fields
-- Use single quotes around the JSON string in `.env`
-
-**"Model not available"**
-- Some Gemini models may not be available in all regions
-- Check Google AI Studio for model availability
-- Fall back to `gemini-pro` if other models fail
-
-**"Redis connection failed"**
-- Check Redis is running: `docker-compose ps redis`
-- Verify network connectivity: `docker-compose logs redis`
-
-**"PostgreSQL connection failed"**
-- Ensure PostgreSQL is healthy: `docker-compose ps postgres`
-- Check credentials match `.env` configuration
-
-### Getting Help
-
-- Check the logs: `docker-compose logs -f api`
-- Verify service health: `curl http://localhost:8000/health`
-- Test agent configuration: Check startup logs for model assignments 
+**Note**: This is a development version. For production deployment, ensure proper security configurations, monitoring setup, and resource provisioning. 
