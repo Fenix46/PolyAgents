@@ -419,39 +419,83 @@ class RedisBus:
         channel: str,
         start_id: str = "$"
     ) -> AsyncGenerator[Message, None]:
-        """
-        Stream messages from a channel in real-time.
-        """
+        """Stream messages from a Redis stream."""
         if not self.connected or not self.redis_client:
             raise RuntimeError("Redis not connected")
         
         try:
             while True:
-                result = await self.redis_client.xread({channel: start_id}, block=1000)
+                # Read new messages
+                stream_data = await self.redis_client.xread(
+                    {channel: start_id},
+                    count=10,
+                    block=1000  # 1 second timeout
+                )
                 
-                if result:
-                    for stream_name, messages in result:
-                        for message_id, fields in messages:
-                            try:
-                                message = Message(
-                                    id=fields["id"],
-                                    conversation_id=fields["conversation_id"],
-                                    sender=fields["sender"],
-                                    content=fields["content"],
-                                    turn=int(fields["turn"]),
-                                    timestamp=fields["timestamp"],
-                                    metadata=json.loads(fields.get("metadata", "{}"))
-                                )
-                                
-                                start_id = message_id  # Update for next read
-                                yield message
-                                
-                            except Exception as e:
-                                logger.warning(f"Failed to parse streamed message: {e}")
-                                continue
+                for stream_name, messages in stream_data:
+                    for message_id, fields in messages:
+                        try:
+                            message = Message(
+                                id=fields["id"],
+                                conversation_id=fields["conversation_id"],
+                                sender=fields["sender"],
+                                content=fields["content"],
+                                turn=int(fields["turn"]),
+                                timestamp=fields["timestamp"],
+                                metadata=json.loads(fields.get("metadata", "{}"))
+                            )
+                            yield message
+                        except Exception as e:
+                            logger.warning(f"Failed to parse message from stream: {e}")
+                            continue
                 
-        except asyncio.CancelledError:
-            logger.info(f"Message streaming for {channel} cancelled")
+                # Update start_id to latest message
+                if stream_data:
+                    start_id = stream_data[-1][1][-1][0]
+                    
         except Exception as e:
-            logger.error(f"Error in message streaming: {e}")
-            raise 
+            logger.error(f"Error streaming messages: {e}")
+    
+    async def subscribe_to_messages(self) -> AsyncGenerator[Dict[str, Any], None]:
+        """Subscribe to all messages from Redis streams."""
+        if not self.connected or not self.redis_client:
+            raise RuntimeError("Redis not connected")
+        
+        try:
+            # Get all active conversation streams
+            active_streams = await self.get_active_conversations()
+            
+            if not active_streams:
+                # If no active streams, wait and retry
+                await asyncio.sleep(1)
+                return
+            
+            # Subscribe to all active streams
+            stream_data = await self.redis_client.xread(
+                {stream: "$" for stream in active_streams},
+                count=10,
+                block=1000
+            )
+            
+            for stream_name, messages in stream_data:
+                for message_id, fields in messages:
+                    try:
+                        message_data = {
+                            "stream": stream_name,
+                            "message_id": message_id,
+                            "conversation_id": fields.get("conversation_id"),
+                            "sender": fields.get("sender"),
+                            "content": fields.get("content"),
+                            "turn": int(fields.get("turn", 0)),
+                            "timestamp": fields.get("timestamp"),
+                            "metadata": json.loads(fields.get("metadata", "{}"))
+                        }
+                        yield message_data
+                    except Exception as e:
+                        logger.warning(f"Failed to parse message: {e}")
+                        continue
+                        
+        except Exception as e:
+            logger.error(f"Error in subscribe_to_messages: {e}")
+            # Return empty generator on error
+            return 

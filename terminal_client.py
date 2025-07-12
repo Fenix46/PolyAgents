@@ -68,7 +68,7 @@ class TerminalClient:
         ws_url = f"{self.ws_base_url}/ws/{conversation_id}"
 
         try:
-            async with websockets.connect(ws_url, extra_headers={"Authorization": f"Bearer {self.api_key}"}) as websocket:
+            async with websockets.connect(ws_url, additional_headers={"Authorization": f"Bearer {self.api_key}"}) as websocket:
                 # First, send the initial prompt via HTTP to start the process
                 await self._trigger_streaming_chat(prompt, conversation_id)
                 
