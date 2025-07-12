@@ -73,10 +73,16 @@ class Settings(BaseSettings):
     )
     
     # CORS Settings
-    cors_origins: List[str] = Field(default=["*"], description="CORS allowed origins")
+    cors_origins: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000", "http://127.0.0.1:8080"], 
+        description="CORS allowed origins"
+    )
     cors_allow_credentials: bool = Field(default=True, description="CORS allow credentials")
-    cors_allow_methods: List[str] = Field(default=["*"], description="CORS allowed methods")
-    cors_allow_headers: List[str] = Field(default=["*"], description="CORS allowed headers")
+    cors_allow_methods: List[str] = Field(default=["GET", "POST", "PUT", "DELETE", "OPTIONS"], description="CORS allowed methods")
+    cors_allow_headers: List[str] = Field(
+        default=["*", "Authorization", "Content-Type", "X-Requested-With"], 
+        description="CORS allowed headers"
+    )
     
     # Health Check Settings
     health_check_timeout: float = Field(default=5.0, description="Health check timeout in seconds")

@@ -1,32 +1,34 @@
 services:
-  frontend:
-    build: ./frontend
-    container_name: polyagents-frontend
+  frontend-dev:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: polyagents-frontend-dev
     ports:
-      - "3000:80"
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
     depends_on:
       api:
         condition: service_healthy
     networks:
       - polyagents-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   api:
     build: .
-    container_name: polyagents-api
-    # Remove direct port exposure since it will be accessed through frontend proxy
-    # ports:
-    #   - "8000:8000"
+    container_name: polyagents-api-dev
+    ports:
+      - "8000:8000"
     environment:
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
       - QDRANT_HOST=qdrant
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
     depends_on:
       redis:
         condition: service_healthy
@@ -45,12 +47,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: polyagents-redis
+    container_name: polyagents-redis-dev
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - redis_data_dev:/data
     networks:
       - polyagents-network
     healthcheck:
@@ -61,7 +63,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: polyagents-postgres
+    container_name: polyagents-postgres-dev
     ports:
       - "5432:5432"
     environment:
@@ -69,7 +71,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - polyagents-network
@@ -81,12 +83,12 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: polyagents-qdrant
+    container_name: polyagents-qdrant-dev
     ports:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - qdrant_data:/qdrant/storage
+      - qdrant_data_dev:/qdrant/storage
     networks:
       - polyagents-network
     environment:
@@ -94,11 +96,11 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
 
 volumes:
-  redis_data:
+  redis_data_dev:
     driver: local
-  postgres_data:
+  postgres_data_dev:
     driver: local
-  qdrant_data:
+  qdrant_data_dev:
     driver: local
 
 networks:

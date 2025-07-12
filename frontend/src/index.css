@@ -1,0 +1,290 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* PolyAgents Dark Theme */
+    --background: 216 50% 12%;
+    --foreground: 213 31% 97%;
+
+    --card: 217 33% 17%;
+    --card-foreground: 213 31% 97%;
+
+    --popover: 217 33% 17%;
+    --popover-foreground: 213 31% 97%;
+
+    --primary: 231 81% 67%;
+    --primary-foreground: 217 33% 17%;
+
+    --secondary: 258 86% 66%;
+    --secondary-foreground: 213 31% 97%;
+
+    --muted: 217 33% 25%;
+    --muted-foreground: 213 31% 70%;
+
+    --accent: 231 81% 67%;
+    --accent-foreground: 217 33% 17%;
+
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 213 31% 97%;
+
+    --success: 158 84% 40%;
+    --success-foreground: 213 31% 97%;
+
+    --warning: 36 92% 51%;
+    --warning-foreground: 217 33% 17%;
+
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 231 81% 67%;
+
+    --radius: 0.75rem;
+
+    /* PolyAgents specific colors */
+    --surface: 217 33% 17%;
+    --surface-hover: 217 33% 22%;
+    --surface-active: 217 33% 27%;
+    
+    /* Agent colors */
+    --agent-1: 231 81% 67%;  /* Primary indigo */
+    --agent-2: 258 86% 66%;  /* Secondary violet */
+    --agent-3: 158 84% 40%;  /* Success emerald */
+    --agent-4: 36 92% 51%;   /* Warning amber */
+    --agent-5: 0 85% 60%;    /* Error red */
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(231 81% 67%), hsl(258 86% 66%));
+    --gradient-surface: linear-gradient(135deg, hsl(217 33% 17%), hsl(217 33% 22%));
+    --gradient-glow: linear-gradient(135deg, hsl(231 81% 67% / 0.2), hsl(258 86% 66% / 0.2));
+    
+    /* Animations */
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+    /* Sidebar variables */
+    --sidebar-background: 217 33% 17%;
+    --sidebar-foreground: 213 31% 97%;
+    --sidebar-primary: 231 81% 67%;
+    --sidebar-primary-foreground: 217 33% 17%;
+    --sidebar-accent: 217 33% 25%;
+    --sidebar-accent-foreground: 213 31% 97%;
+    --sidebar-border: 217 33% 25%;
+    --sidebar-ring: 231 81% 67%;
+  }
+
+  .dark {
+    /* Dark theme already default for PolyAgents */
+    --background: 216 50% 12%;
+    --foreground: 213 31% 97%;
+
+    --card: 217 33% 17%;
+    --card-foreground: 213 31% 97%;
+
+    --popover: 217 33% 17%;
+    --popover-foreground: 213 31% 97%;
+
+    --primary: 231 81% 67%;
+    --primary-foreground: 217 33% 17%;
+
+    --secondary: 258 86% 66%;
+    --secondary-foreground: 213 31% 97%;
+
+    --muted: 217 33% 25%;
+    --muted-foreground: 213 31% 70%;
+
+    --accent: 231 81% 67%;
+    --accent-foreground: 217 33% 17%;
+
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 213 31% 97%;
+
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 231 81% 67%;
+
+    --sidebar-background: 217 33% 17%;
+    --sidebar-foreground: 213 31% 97%;
+    --sidebar-primary: 231 81% 67%;
+    --sidebar-primary-foreground: 217 33% 17%;
+    --sidebar-accent: 217 33% 25%;
+    --sidebar-accent-foreground: 213 31% 97%;
+    --sidebar-border: 217 33% 25%;
+    --sidebar-ring: 231 81% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-['Inter'] antialiased;
+  }
+}
+
+@layer base {
+  /* Custom animations */
+  @keyframes pulse-glow {
+    0%, 100% { 
+      opacity: 1; 
+      box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+    }
+    50% { 
+      opacity: 0.7; 
+      box-shadow: 0 0 40px hsl(var(--primary) / 0.5);
+    }
+  }
+
+  @keyframes typing {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+  }
+
+  @keyframes slide-in {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-typing {
+    animation: typing 1.5s ease-in-out infinite;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+}
+
+@layer components {
+  .agent-bubble {
+    @apply rounded-2xl px-4 py-3 max-w-[80%] shadow-lg;
+    transition: var(--transition-smooth);
+  }
+
+  .agent-bubble.agent-1 {
+    @apply bg-gradient-to-br from-[hsl(231_81%_67%_/_0.2)] to-[hsl(231_81%_67%_/_0.1)] 
+           border border-[hsl(231_81%_67%_/_0.3)] text-foreground;
+  }
+
+  .agent-bubble.agent-2 {
+    @apply bg-gradient-to-br from-[hsl(258_86%_66%_/_0.2)] to-[hsl(258_86%_66%_/_0.1)] 
+           border border-[hsl(258_86%_66%_/_0.3)] text-foreground;
+  }
+
+  .agent-bubble.agent-3 {
+    @apply bg-gradient-to-br from-[hsl(158_84%_40%_/_0.2)] to-[hsl(158_84%_40%_/_0.1)] 
+           border border-[hsl(158_84%_40%_/_0.3)] text-foreground;
+  }
+
+  .agent-bubble.agent-4 {
+    @apply bg-gradient-to-br from-[hsl(36_92%_51%_/_0.2)] to-[hsl(36_92%_51%_/_0.1)] 
+           border border-[hsl(36_92%_51%_/_0.3)] text-foreground;
+  }
+
+  .agent-bubble.agent-5 {
+    @apply bg-gradient-to-br from-[hsl(0_85%_60%_/_0.2)] to-[hsl(0_85%_60%_/_0.1)] 
+           border border-[hsl(0_85%_60%_/_0.3)] text-foreground;
+  }
+
+  .user-bubble {
+    @apply bg-gradient-to-br from-primary to-primary/80 text-primary-foreground
+           rounded-2xl px-4 py-3 max-w-[80%] shadow-lg;
+  }
+
+  .consensus-bubble {
+    @apply bg-gradient-to-br from-accent/20 to-accent/10 
+           border border-accent/30 text-foreground
+           rounded-2xl px-4 py-3 max-w-[90%] shadow-lg;
+  }
+
+  .system-bubble {
+    @apply bg-muted/50 text-muted-foreground
+           rounded-xl px-3 py-2 text-sm;
+  }
+
+  .glass-effect {
+    @apply backdrop-blur-sm bg-surface/80 border border-border/50;
+  }
+
+  .surface-hover {
+    @apply hover:bg-surface-hover transition-colors duration-200;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  /* New scrollbar classes for panel alignment */
+  .scrollbar-thumb-slate-600 {
+    scrollbar-color: hsl(215 25% 40%) transparent;
+  }
+  
+  .scrollbar-thumb-slate-600::-webkit-scrollbar-thumb {
+    background: hsl(215 25% 40%);
+  }
+  
+  .scrollbar-track-transparent {
+    scrollbar-color: hsl(215 25% 40%) transparent;
+  }
+  
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

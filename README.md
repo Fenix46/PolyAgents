@@ -49,25 +49,60 @@ git clone <repository-url>
 cd PolyAgents-main
 ```
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure environment
+### 2. Configure environment
 ```bash
 cp env.example .env
 # Edit .env with your configurations
 ```
 
-### 4. Set up infrastructure
+### 3. Run with Docker Compose (Recommended)
 
-#### Using Docker Compose (Recommended)
+#### Full Stack (Frontend + Backend)
 ```bash
+# Build and start all services
 docker-compose up -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:3000/api
+# WebSocket: ws://localhost:3000/ws
 ```
 
-#### Manual Setup
+#### Backend Only
+```bash
+# Start only backend services
+docker-compose up -d api redis postgres qdrant
+
+# Access the API directly
+# API: http://localhost:8000
+# WebSocket: ws://localhost:8000/ws
+```
+
+#### Development Mode
+```bash
+# Start development environment with hot reloading
+docker-compose -f docker-compose.dev.yml up -d
+
+# Access the application
+# Frontend: http://localhost:8080 (with hot reloading)
+# Backend API: http://localhost:8000
+# WebSocket: ws://localhost:8000/ws
+```
+
+### 4. Manual Setup (Development)
+
+#### Backend Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### Frontend Dependencies
+```bash
+cd frontend
+npm install
+```
+
+#### Infrastructure Setup
 ```bash
 # Redis
 redis-server
@@ -79,9 +114,14 @@ createdb polyagents
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-### 5. Run the application
+#### Run Services
 ```bash
+# Backend
 python -m app.main
+
+# Frontend (in another terminal)
+cd frontend
+npm run dev
 ```
 
 ## ⚙️ Configuration
@@ -171,6 +211,62 @@ AGENT_MODELS_CONFIG=[
   }
 ]
 ```
+
+## 🎨 Frontend
+
+The PolyAgents frontend is a modern React application built with:
+
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **Shadcn/ui** for UI components
+- **React Query** for state management
+- **WebSocket** for real-time updates
+
+### Frontend Features
+
+- **Real-time Chat Interface**: Live conversation with multiple agents
+- **Agent Status Panel**: Monitor agent activity and system health
+- **Conversation Management**: Browse, search, and manage conversations
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark Mode**: Modern dark theme optimized for long sessions
+- **WebSocket Integration**: Real-time updates for agent responses and status
+
+### Frontend Development
+
+```bash
+# Install dependencies
+cd frontend
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Frontend Configuration
+
+The frontend uses environment variables for configuration:
+
+```env
+# Production environment (frontend/env.production)
+VITE_API_BASE_URL=/api
+VITE_WS_BASE_URL=ws://localhost/ws
+VITE_API_KEY=pa_your_secret_key_here
+```
+
+### Frontend Architecture
+
+- **Components**: Modular UI components in `src/components/`
+- **Pages**: Route components in `src/pages/`
+- **Services**: API and WebSocket services in `src/services/`
+- **Hooks**: Custom React hooks in `src/hooks/`
+- **Types**: TypeScript definitions in `src/types/`
 
 ## 🌐 API Endpoints
 
@@ -648,54 +744,55 @@ For issues and questions:
 
 **Note**: This is a development version. For production deployment, ensure proper security configurations, monitoring setup, and resource provisioning. 
 
-## Quickstart
+## 🚀 Quick Start
 
-### 1. Prerequisites
+### Using the Deployment Script
 
-*   Docker and Docker Compose
-*   Python 3.11+
-*   An active Google Gemini API Key
-
-### 2. Configuration
-
-1.  **Copy the environment template:**
-    ```bash
-    cp env.example .env
-    ```
-
-2.  **Edit the `.env` file:**
-    *   Set your `GEMINI_API_KEY`.
-    *   Create a default API key for the client. Under `DEFAULT_API_KEYS`, add a configuration like this:
-        ```
-        DEFAULT_API_KEYS=[{"name":"terminal-user","key":"your-secret-api-key","permissions":["read","write"]}]
-        ```
-        Replace `your-secret-api-key` with a secure key of your choice.
-
-### 3. Running with Docker
-
-This is the recommended way to run the entire system, including all databases.
+The easiest way to deploy PolyAgents is using the provided deployment script:
 
 ```bash
-docker-compose up --build
+# Make the script executable (first time only)
+chmod +x deploy.sh
+
+# Run the deployment
+./deploy.sh
 ```
 
-The API will be available at `http://localhost:8000`.
+This script will:
+- Check for required dependencies (Docker, docker-compose)
+- Verify environment configuration
+- Build and start all services
+- Wait for services to be healthy
+- Provide access information
 
-### 4. Using the Terminal Client
+### Manual Deployment
 
-Once the Docker containers are running, you can chat with the system using the built-in terminal client.
+#### 1. Configure Environment
+```bash
+# Copy and edit environment file
+cp env.example .env
 
-1.  **Install dependencies:**
-    It's recommended to use a virtual environment.
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
+# Edit .env with your settings
+# - Add your GEMINI_API_KEY
+# - Configure database settings
+# - Set up API keys
+```
 
-2.  **Run the client:**
-    ```bash
-    python terminal_client.py
-    ```
+#### 2. Deploy with Docker Compose
+```bash
+# Build and start all services
+docker-compose up -d --build
 
-    You can now type your messages and see the multi-agent system work in real-time. 
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+```
+
+#### 3. Access the Application
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:3000/api
+- **WebSocket**: ws://localhost:3000/ws
+
+## 🚀 Quick Start 
