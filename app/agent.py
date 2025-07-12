@@ -5,7 +5,7 @@ import logging
 from typing import List, Optional
 import asyncio
 
-from google import genai
+import google.generativeai as genai
 
 from .models import Message
 from .memory.redis_bus import RedisBus
@@ -20,13 +20,13 @@ class Agent:
     def __init__(
         self, 
         agent_id: str, 
-        model_name: str,
+        model: str,
         redis_bus: RedisBus,
         personality: Optional[str] = None,
         temperature: Optional[float] = None
     ):
         self.agent_id = agent_id
-        self.model_name = model_name
+        self.model = model
         self.redis_bus = redis_bus
         self.personality = personality or self._get_default_personality()
         self.temperature = temperature or settings.gemini_temperature
@@ -36,8 +36,8 @@ class Agent:
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
-        self.client = genai.Client(api_key=api_key)
-        logger.info(f"Agent {agent_id} initialized with model {model_name} (temp={self.temperature})")
+        genai.configure(api_key=api_key)
+        logger.info(f"Agent {agent_id} initialized with model {self.model} (temp={self.temperature})")
     
     def _get_default_personality(self) -> str:
         """Get default personality based on agent ID."""
@@ -49,17 +49,17 @@ class Agent:
         }
         return personalities.get(self.agent_id, "You are a helpful AI assistant.")
     
-    async def call_gemini(self, prompt: str, model: str) -> str:
+    async def call_gemini(self, prompt: str, model_to_use: str) -> str:
         """Make async call to Gemini API."""
         try:
             # Use asyncio to run the sync Gemini call in a thread pool
             loop = asyncio.get_event_loop()
             
             def _sync_call():
-                response = self.client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=genai.GenerateContentConfig(
+                model = genai.GenerativeModel(model_to_use)
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
                         temperature=self.temperature,
                         max_output_tokens=settings.gemini_max_tokens,
                     )
@@ -93,7 +93,7 @@ class Agent:
             full_prompt = "\n".join(context_parts)
             
             # Call Gemini
-            response = await self.call_gemini(full_prompt, self.model_name)
+            response = await self.call_gemini(full_prompt, self.model)
             
             logger.debug(f"Agent {self.agent_id} generated response: {response[:100]}...")
             return response

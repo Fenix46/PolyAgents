@@ -647,3 +647,55 @@ For issues and questions:
 ---
 
 **Note**: This is a development version. For production deployment, ensure proper security configurations, monitoring setup, and resource provisioning. 
+
+## Quickstart
+
+### 1. Prerequisites
+
+*   Docker and Docker Compose
+*   Python 3.11+
+*   An active Google Gemini API Key
+
+### 2. Configuration
+
+1.  **Copy the environment template:**
+    ```bash
+    cp env.example .env
+    ```
+
+2.  **Edit the `.env` file:**
+    *   Set your `GEMINI_API_KEY`.
+    *   Create a default API key for the client. Under `DEFAULT_API_KEYS`, add a configuration like this:
+        ```
+        DEFAULT_API_KEYS=[{"name":"terminal-user","key":"your-secret-api-key","permissions":["read","write"]}]
+        ```
+        Replace `your-secret-api-key` with a secure key of your choice.
+
+### 3. Running with Docker
+
+This is the recommended way to run the entire system, including all databases.
+
+```bash
+docker-compose up --build
+```
+
+The API will be available at `http://localhost:8000`.
+
+### 4. Using the Terminal Client
+
+Once the Docker containers are running, you can chat with the system using the built-in terminal client.
+
+1.  **Install dependencies:**
+    It's recommended to use a virtual environment.
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
+
+2.  **Run the client:**
+    ```bash
+    python terminal_client.py
+    ```
+
+    You can now type your messages and see the multi-agent system work in real-time. 

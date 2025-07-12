@@ -15,7 +15,7 @@ import uvicorn
 from .models import ChatRequest, ChatResponse, ConversationListResponse, MessageSearchRequest
 from .orchestrator import Orchestrator
 from .memory.redis_bus import RedisBus
-from .memory.postgres_log import PostgresLog
+from .memory.postgres_log import PostgresLogger
 from .memory.qdrant_store import QdrantStore
 from .websocket import WebSocketConnectionManager
 from .config import settings
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Global instances
 redis_bus: Optional[RedisBus] = None
-postgres_log: Optional[PostgresLog] = None
+postgres_log: Optional[PostgresLogger] = None
 qdrant_store: Optional[QdrantStore] = None
 orchestrator: Optional[Orchestrator] = None
 websocket_manager: Optional[WebSocketConnectionManager] = None
@@ -60,8 +60,8 @@ async def lifespan(app: FastAPI):
         await redis_bus.initialize()
         logger.info("Redis bus initialized")
         
-        postgres_log = PostgresLog()
-        await postgres_log.initialize()
+        postgres_log = PostgresLogger()
+        await postgres_log.connect()
         logger.info("PostgreSQL log initialized")
         
         # Initialize optional Qdrant (graceful degradation if not available)

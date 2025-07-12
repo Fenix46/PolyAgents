@@ -30,7 +30,7 @@ class MessageRecord(Base):
     content: Mapped[str] = mapped_column(Text)
     turn: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    message_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
 class ConversationRecord(Base):
@@ -97,6 +97,10 @@ class PostgresLogger:
             self.connected = False
             logger.info("Disconnected from PostgreSQL")
     
+    async def cleanup(self) -> None:
+        """Clean up the PostgreSQL logger (alias for disconnect)."""
+        await self.disconnect()
+    
     async def log_message(self, message: Message) -> None:
         """Log a message to the database."""
         if not self.connected or not self.session_factory:
@@ -111,7 +115,7 @@ class PostgresLogger:
                     content=message.content,
                     turn=message.turn,
                     timestamp=message.timestamp,
-                    metadata=message.metadata
+                    message_metadata=message.metadata
                 )
                 
                 session.add(message_record)
@@ -182,7 +186,7 @@ class PostgresLogger:
                         content=record.content,
                         turn=record.turn,
                         timestamp=record.timestamp,
-                        metadata=record.metadata
+                        metadata=record.message_metadata
                     )
                     for record in message_records
                 ]

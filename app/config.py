@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # Agent Settings
     num_agents: int = Field(default=3, description="Number of agents to spawn")
     default_turns: int = Field(default=2, description="Default conversation turns")
+    consensus_algorithm: str = Field(default="semantic", description="Consensus algorithm (semantic or majority_vote)")
     
     # Gemini Settings - Default fallback
     gemini_api_key: Optional[str] = Field(default=None, description="Gemini API key")

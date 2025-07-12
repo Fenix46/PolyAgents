@@ -1,0 +1,3 @@
+-- This file is intentionally left blank.
+-- It is required by the docker-compose.yml to successfully start the postgres service.
+-- The application manages the database schema using its own migration tools (e.g., SQLAlchemy/Alembic). 

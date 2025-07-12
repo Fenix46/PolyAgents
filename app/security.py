@@ -8,6 +8,7 @@ from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
 from collections import defaultdict
 import asyncio
+from enum import Enum
 
 from fastapi import HTTPException, Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -18,6 +19,13 @@ from passlib.context import CryptContext
 from .config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class Permission(Enum):
+    """Permission constants for API access control."""
+    READ = "read"
+    WRITE = "write"
+    ADMIN = "admin"
 
 
 class SecurityConfig:
@@ -214,57 +222,54 @@ class SecurityManager:
         # Check for specific permission
         return required_permission in api_key.permissions
     
-    def check_rate_limit(self, identifier: str) -> tuple[bool, Dict[str, Any]]:
-        """Check rate limit for identifier (IP address or API key)."""
+    def _check_rate_limit_internal(self, identifier: str) -> tuple[bool, Dict[str, Any]]:
+        """Check rate limit for an identifier."""
         current_time = time.time()
-        limit_info = self.rate_limits[identifier]
+        rate_limit = self.rate_limits[identifier]
+        
+        # Check if we're in a new window
+        if current_time - rate_limit.window_start > SecurityConfig.RATE_LIMIT_WINDOW:
+            rate_limit.requests_made = 0
+            rate_limit.window_start = current_time
+            rate_limit.burst_tokens = SecurityConfig.RATE_LIMIT_BURST
+            rate_limit.blocked_until = None
         
         # Check if currently blocked
-        if limit_info.blocked_until and current_time < limit_info.blocked_until:
+        if rate_limit.blocked_until and current_time < rate_limit.blocked_until:
+            retry_after = int(rate_limit.blocked_until - current_time)
             return False, {
-                "allowed": False,
-                "reason": "temporarily_blocked",
-                "blocked_until": limit_info.blocked_until,
-                "retry_after": int(limit_info.blocked_until - current_time)
+                "blocked": True,
+                "retry_after": retry_after,
+                "reason": "Rate limit exceeded"
             }
         
-        # Reset window if expired
-        if current_time - limit_info.window_start >= SecurityConfig.RATE_LIMIT_WINDOW:
-            limit_info.requests_made = 0
-            limit_info.window_start = current_time
-            limit_info.burst_tokens = SecurityConfig.RATE_LIMIT_BURST
-            limit_info.blocked_until = None
-        
-        # Check burst capacity first
-        if limit_info.burst_tokens > 0:
-            limit_info.burst_tokens -= 1
-            limit_info.requests_made += 1
-            return True, {
-                "allowed": True,
-                "requests_made": limit_info.requests_made,
-                "burst_tokens_remaining": limit_info.burst_tokens
-            }
+        # Check burst tokens first
+        if rate_limit.burst_tokens > 0:
+            rate_limit.burst_tokens -= 1
+            return True, {"burst_used": True}
         
         # Check regular rate limit
-        if limit_info.requests_made >= SecurityConfig.RATE_LIMIT_REQUESTS:
-            # Block for remaining window time
-            limit_info.blocked_until = limit_info.window_start + SecurityConfig.RATE_LIMIT_WINDOW
-            
-            return False, {
-                "allowed": False,
-                "reason": "rate_limit_exceeded",
-                "requests_made": limit_info.requests_made,
-                "window_start": limit_info.window_start,
-                "retry_after": int(limit_info.blocked_until - current_time)
-            }
+        if rate_limit.requests_made < SecurityConfig.RATE_LIMIT_REQUESTS:
+            rate_limit.requests_made += 1
+            return True, {"requests_remaining": SecurityConfig.RATE_LIMIT_REQUESTS - rate_limit.requests_made}
         
-        # Allow request
-        limit_info.requests_made += 1
-        return True, {
-            "allowed": True,
-            "requests_made": limit_info.requests_made,
-            "remaining": SecurityConfig.RATE_LIMIT_REQUESTS - limit_info.requests_made
+        # Rate limit exceeded - block for a period
+        block_duration = min(300, SecurityConfig.RATE_LIMIT_WINDOW)  # Block for up to 5 minutes
+        rate_limit.blocked_until = current_time + block_duration
+        
+        return False, {
+            "blocked": True,
+            "retry_after": block_duration,
+            "reason": "Rate limit exceeded"
         }
+    
+    async def check_rate_limit(self, client_id: str, client_ip: str) -> None:
+        """Check rate limit for a client."""
+        identifier = f"{client_id}:{client_ip}"
+        allowed, info = self._check_rate_limit_internal(identifier)
+        
+        if not allowed:
+            raise ValueError(f"Rate limit exceeded. Try again in {info.get('retry_after', 60)} seconds")
     
     def generate_jwt_token(self, user_id: str, permissions: List[str]) -> str:
         """Generate JWT token for user."""
@@ -305,19 +310,54 @@ class SecurityManager:
             return None
     
     def get_client_ip(self, request: Request) -> str:
-        """Extract client IP address from request."""
-        # Check X-Forwarded-For header first (for reverse proxies)
+        """Get client IP address from request."""
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
             return forwarded_for.split(",")[0].strip()
         
-        # Check X-Real-IP header
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
             return real_ip
         
-        # Fall back to direct connection IP
         return request.client.host if request.client else "unknown"
+    
+    async def initialize(self) -> None:
+        """Initialize the security manager."""
+        logger.info("Initializing SecurityManager")
+        self.start_cleanup_task()
+    
+    async def start_background_tasks(self) -> None:
+        """Start background tasks (alias for start_cleanup_task)."""
+        self.start_cleanup_task()
+    
+    async def cleanup(self) -> None:
+        """Clean up the security manager."""
+        logger.info("Cleaning up SecurityManager")
+        await self.stop_cleanup_task()
+    
+    async def verify_api_key(self, api_key: str) -> Dict[str, Any]:
+        """Verify API key and return user info."""
+        if not api_key:
+            raise ValueError("API key is required")
+        
+        api_key_data = self.validate_api_key(api_key)
+        if not api_key_data:
+            raise ValueError("Invalid API key")
+        
+        return {
+            "authenticated": True,
+            "client_id": api_key_data.key_id,
+            "permissions": api_key_data.permissions,
+            "name": api_key_data.name
+        }
+    
+    async def check_rate_limit(self, client_id: str, client_ip: str) -> None:
+        """Check rate limit for a client."""
+        identifier = f"{client_id}:{client_ip}"
+        allowed, info = self._check_rate_limit_internal(identifier)
+        
+        if not allowed:
+            raise ValueError(f"Rate limit exceeded. Try again in {info.get('retry_after', 60)} seconds")
 
 
 # Global security manager instance

@@ -24,6 +24,10 @@ class QdrantStore:
         self.collection_name = "conversation_memory"
         self.connected = False
     
+    async def initialize(self) -> None:
+        """Initialize the Qdrant store (alias for connect)."""
+        await self.connect()
+    
     async def connect(self) -> None:
         """Connect to Qdrant."""
         try:
@@ -58,6 +62,10 @@ class QdrantStore:
             self.client = None
             self.connected = False
             logger.info("Disconnected from Qdrant")
+    
+    async def cleanup(self) -> None:
+        """Clean up the Qdrant store (alias for disconnect)."""
+        await self.disconnect()
     
     async def _ensure_collection_exists(self) -> None:
         """Ensure the conversation memory collection exists."""

@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 class Orchestrator:
     """Coordinates multi-agent conversations and consensus building."""
     
-    def __init__(self):
-        self.redis_bus = RedisBus()
-        self.postgres_logger = PostgresLogger()
-        self.consensus_engine = ConsensusEngine()
+    def __init__(self, redis_bus=None, postgres_logger=None, qdrant_store=None):
+        self.redis_bus = redis_bus or RedisBus()
+        self.postgres_logger = postgres_logger or PostgresLogger()
+        self.qdrant_store = qdrant_store
+        self.consensus_engine = ConsensusEngine(algorithm=settings.consensus_algorithm)
         self.agents: List[Agent] = []
         self.initialized = False
     
@@ -39,7 +40,7 @@ class Orchestrator:
         for config in agent_configs:
             agent = Agent(
                 agent_id=config.agent_id,
-                model_name=config.model,
+                model=config.model,
                 redis_bus=self.redis_bus,
                 personality=config.personality,
                 temperature=config.temperature
@@ -64,7 +65,7 @@ class Orchestrator:
             "postgres_connected": self.postgres_logger.connected,
             "total_agents": len(self.agents),
             "agent_models": [
-                {"agent_id": agent.agent_id, "model": agent.model_name}
+                {"agent_id": agent.agent_id, "model": agent.model}
                 for agent in self.agents
             ]
         }

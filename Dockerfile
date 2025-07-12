@@ -4,7 +4,9 @@ FROM python:3.11-slim as base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TRANSFORMERS_CACHE=/app/.cache/transformers \
+    HF_HOME=/app/.cache/huggingface
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -27,8 +29,9 @@ RUN pip install -r requirements.txt
 COPY app/ ./app/
 COPY pyproject.toml .
 
-# Change ownership to non-root user
-RUN chown -R appuser:appuser /app
+# Create cache directories and change ownership to non-root user
+RUN mkdir -p /app/.cache/transformers /app/.cache/huggingface && \
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser

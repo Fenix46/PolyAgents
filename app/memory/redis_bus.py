@@ -20,6 +20,14 @@ class RedisBus:
         self.connected = False
         self._subscription_tasks: Dict[str, asyncio.Task] = {}
     
+    async def initialize(self) -> None:
+        """Initialize the Redis bus (alias for connect)."""
+        await self.connect()
+    
+    async def cleanup(self) -> None:
+        """Clean up the Redis bus (alias for disconnect)."""
+        await self.disconnect()
+    
     async def connect(self) -> None:
         """Connect to Redis."""
         try:
