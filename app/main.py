@@ -330,8 +330,6 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
         await websocket.close(code=1013)
         return
     
-    await websocket.accept()
-    
     try:
         # Add connection to manager
         await websocket_manager.connect(websocket, conversation_id)
