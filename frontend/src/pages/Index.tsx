@@ -14,6 +14,8 @@ const Index = () => {
     conversations,
     currentConversation,
     messages,
+    agentResponses,
+    consensus,
     connectionStatus,
     systemHealth,
     systemStats,
@@ -94,6 +96,8 @@ const Index = () => {
         
         <ChatInterface
           messages={messages}
+          agentResponses={agentResponses}
+          consensus={consensus}
           onSendMessage={handleSendMessage}
           onOpenAgentSettings={handleOpenAgentSettings}
           isLoading={isLoading}

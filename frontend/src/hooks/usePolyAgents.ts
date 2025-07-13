@@ -9,7 +9,8 @@ import {
   WebSocketEvent, 
   ConnectionStatus,
   SystemHealth,
-  SystemStatistics 
+  SystemStatistics,
+  AgentResponse 
 } from '@/types';
 
 export const usePolyAgents = () => {
@@ -19,6 +20,8 @@ export const usePolyAgents = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [agentResponses, setAgentResponses] = useState<AgentResponse[]>([]);
+  const [consensus, setConsensus] = useState<{ content: string; explanation?: string } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ status: 'disconnected' });
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [systemStats, setSystemStats] = useState<SystemStatistics | null>(null);
@@ -110,34 +113,76 @@ export const usePolyAgents = () => {
   // Send message
   const sendMessage = useCallback(async (request: ChatRequest) => {
     try {
+      console.log('🚀 Starting sendMessage with request:', request);
       setIsLoading(true);
       setError(null);
+      setConsensus(null);
       
-      const response = await apiService.chat(request);
+      // Mostra subito le bubble "thinking" per ogni agente
+      const agentCount = request.agents?.count || 3;
+      const thinkingAgents = Array.from({ length: agentCount }, (_, i) => ({
+        agent_id: `agent_${i}`,
+        content: '',
+        status: 'thinking' as const,
+      }));
+      console.log('🤔 Setting thinking agents:', thinkingAgents);
+      setAgentResponses(thinkingAgents);
       
-      // Add user message to the list
+      // Mostra subito il messaggio utente
       const userMessage: Message = {
         id: `user-${Date.now()}`,
-        conversation_id: response.conversation_id,
+        conversation_id: request.conversation_id || '',
         type: 'user',
         content: request.message,
         timestamp: new Date().toISOString(),
       };
+      console.log('👤 Adding user message:', userMessage);
+      setMessages(prev => [...prev, userMessage]);
       
-      // Add agent response to the list
-      const agentMessage: Message = {
-        id: response.message_id,
-        conversation_id: response.conversation_id,
-        type: 'consensus',
-        content: response.response,
-        timestamp: new Date().toISOString(),
-        metadata: response.metadata,
-      };
+      // Chiamata API
+      console.log('📡 Making API call...');
+      const response: ChatResponse = await apiService.chat(request);
+      console.log('📥 API Response received:', response);
+      console.log('🤖 Agent responses from API:', response.agent_responses);
       
-      setMessages(prev => [...prev, userMessage, agentMessage]);
+      // Aggiorna risposte agenti con defensive programming
+      if (response.agent_responses && Array.isArray(response.agent_responses)) {
+        const updatedAgents = response.agent_responses.map(r => ({
+          ...r,
+          status: (r.error ? 'error' : 'ready') as 'error' | 'ready',
+        }));
+        console.log('✅ Updating agent responses:', updatedAgents);
+        setAgentResponses(updatedAgents);
+      } else {
+        console.warn('⚠️ No agent_responses in response:', response);
+        setAgentResponses([]);
+      }
       
+      // Aggiorna consensus con defensive programming
+      if (response.consensus && response.consensus.content) {
+        console.log('🎯 Setting consensus:', response.consensus);
+        setConsensus(response.consensus);
+        
+        // Aggiungi la risposta consensus come messaggio
+        const consensusMessage: Message = {
+          id: response.message_id,
+          conversation_id: response.conversation_id,
+          type: 'consensus',
+          content: response.consensus.content,
+          timestamp: new Date().toISOString(),
+          metadata: response.metadata,
+        };
+        console.log('💬 Adding consensus message:', consensusMessage);
+        setMessages(prev => [...prev, consensusMessage]);
+      } else {
+        console.warn('⚠️ No consensus in response:', response);
+        setConsensus(null);
+      }
+      
+      console.log('✅ sendMessage completed successfully');
       return response;
     } catch (err) {
+      console.error('❌ Error in sendMessage:', err);
       setError(err instanceof Error ? err.message : 'Failed to send message');
       throw err;
     } finally {
@@ -195,6 +240,8 @@ export const usePolyAgents = () => {
     conversations,
     currentConversation,
     messages,
+    agentResponses,
+    consensus,
     connectionStatus,
     systemHealth,
     systemStats,

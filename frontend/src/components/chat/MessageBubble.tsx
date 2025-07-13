@@ -12,16 +12,51 @@ import {
   Check, 
   Zap,
   Users,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
-import { Message } from '@/types';
+import { Message, AgentResponse } from '@/types';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 interface MessageBubbleProps {
   message: Message;
   isTyping?: boolean;
   showMetadata?: boolean;
 }
+
+export const AgentBubble: React.FC<AgentResponse & { index: number }> = ({ agent_id, content, status, error, index }) => {
+  // Defensive programming: return null if required props are missing
+  if (!agent_id || !status) {
+    console.warn('AgentBubble received invalid props:', { agent_id, status });
+    return null;
+  }
+
+  return (
+    <div className="flex items-start gap-2 mb-2">
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-agent-${(index % 5) + 1} text-white font-bold text-lg`}>
+        {index + 1}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm">Agent {index + 1}</span>
+          {status === 'thinking' && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="animate-spin w-3 h-3" /> thinking...</span>
+          )}
+          {status === 'error' && (
+            <span className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> error</span>
+          )}
+        </div>
+        <div className="mt-1 text-sm whitespace-pre-line">
+          {status === 'ready' && content}
+          {status === 'error' && <span className="italic">{error}</span>}
+          {status === 'thinking' && <span className="italic text-muted-foreground">...</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function MessageBubble({ 
   message, 

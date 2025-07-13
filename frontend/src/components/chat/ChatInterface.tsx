@@ -13,11 +13,14 @@ import {
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
-import { Message } from '@/types';
+import { Message, AgentResponse } from '@/types';
 import { cn } from '@/lib/utils';
+import { AgentBubble } from './MessageBubble';
 
 interface ChatInterfaceProps {
   messages: Message[];
+  agentResponses?: AgentResponse[];
+  consensus?: { content: string; explanation?: string } | null;
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
   error?: string | null;
@@ -34,6 +37,8 @@ interface ChatInterfaceProps {
 
 export default function ChatInterface({
   messages,
+  agentResponses = [],
+  consensus = null,
   onSendMessage,
   isLoading = false,
   typingAgents = new Set(),
@@ -50,6 +55,15 @@ export default function ChatInterface({
   const [showToolbar, setShowToolbar] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Debug logging
+  console.log('🎨 ChatInterface render:', {
+    messagesCount: messages.length,
+    agentResponsesCount: agentResponses.length,
+    agentResponses,
+    consensus,
+    isLoading
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -192,13 +206,63 @@ export default function ChatInterface({
                 </Button>
               </motion.div>
             ) : (
-              messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  showMetadata={true}
-                />
-              ))
+              <>
+                {/* Messaggi utente e consensus */}
+                {messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    showMetadata={true}
+                  />
+                ))}
+                {/* Risposte agenti (sotto l'ultimo messaggio utente) */}
+                {(() => {
+                  console.log('🔍 Rendering agent responses:', agentResponses);
+                  return Array.isArray(agentResponses) && agentResponses.filter(Boolean).length > 0 && (
+                    <div className="mt-4">
+                      {agentResponses
+                        .filter(Boolean)
+                        .filter(agent => agent && agent.agent_id && agent.status)
+                        .map((agent, idx) => {
+                          console.log(`🤖 Rendering agent ${idx}:`, agent);
+                          return (
+                            <AgentBubble 
+                              key={agent.agent_id || `agent-${idx}`} 
+                              {...agent} 
+                              index={idx} 
+                            />
+                          );
+                        })}
+                    </div>
+                  );
+                })()}
+                {/* Consensus (bubble separata, evidenziata) */}
+                {(() => {
+                  console.log('🎯 Rendering consensus:', consensus);
+                  return consensus && (
+                    <div className="mt-6">
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-blue-600 text-white font-bold text-lg">
+                          ★
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">Consensus</span>
+                          </div>
+                          <div className="mt-1 text-base font-medium whitespace-pre-line bg-primary/10 rounded-lg p-3">
+                            {consensus.content}
+                          </div>
+                          {consensus.explanation && (
+                            <div className="mt-1 text-xs text-muted-foreground italic">
+                              {consensus.explanation}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
             )}
 
             {/* Typing Indicators */}

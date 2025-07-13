@@ -1,7 +1,7 @@
 """Data models for the poly-agents system."""
 
 from datetime import datetime
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 from pydantic import BaseModel, Field
 
 
@@ -48,8 +48,10 @@ class ChatResponse(BaseModel):
     """Response model for the /chat endpoint."""
     conversation_id: str
     message_id: str
-    response: str
+    response: str  # Keep for backward compatibility
     agent_id: Optional[str] = None
+    agent_responses: Optional[List[Dict[str, Any]]] = None  # Individual agent responses
+    consensus: Optional[Dict[str, Any]] = None  # Consensus result
     metadata: Optional[Dict[str, Any]] = None
 
 class ConversationListResponse(BaseModel):

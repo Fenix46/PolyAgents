@@ -75,20 +75,21 @@ class Orchestrator:
         prompt: str, 
         conversation_id: str,
         n_turns: int = 2
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
         Main orchestration logic:
         1. Broadcast initial prompt to all agents
         2. Run N turns of agent responses
         3. Apply consensus algorithm
         4. Log everything to postgres
-        5. Return final answer
+        5. Return final answer with agent responses
         """
         if not self.initialized:
             raise RuntimeError("Orchestrator not initialized")
         
         channel = f"chat:{conversation_id}"
         messages: List[Message] = []
+        agent_responses: List[Dict[str, Any]] = []
         
         try:
             # Log initial prompt
@@ -115,11 +116,11 @@ class Orchestrator:
                     for agent in self.agents
                 ]
                 
-                agent_responses = await asyncio.gather(*agent_tasks, return_exceptions=True)
+                agent_responses_turn = await asyncio.gather(*agent_tasks, return_exceptions=True)
                 
                 # Filter out exceptions and collect valid responses
                 valid_responses = [
-                    resp for resp in agent_responses 
+                    resp for resp in agent_responses_turn 
                     if isinstance(resp, Message)
                 ]
                 
@@ -131,6 +132,18 @@ class Orchestrator:
                     messages.append(response)
                     await self.postgres_logger.log_message(response)
                     await self.redis_bus.send_message(channel, response)
+                
+                # Store agent responses for final turn
+                if turn == n_turns:
+                    agent_responses = [
+                        {
+                            "agent_id": msg.sender,
+                            "content": msg.content,
+                            "status": "ready",
+                            "turn": msg.turn
+                        }
+                        for msg in valid_responses
+                    ]
                 
                 logger.info(f"Turn {turn} completed with {len(valid_responses)} responses")
             
@@ -165,7 +178,15 @@ class Orchestrator:
             )
             await self.postgres_logger.log_conversation_result(result)
             
-            return consensus_result.final_answer
+            return {
+                "final_answer": consensus_result.final_answer,
+                "agent_responses": agent_responses,
+                "consensus": {
+                    "content": consensus_result.final_answer,
+                    "explanation": f"Consensus reached with {consensus_result.winning_votes}/{consensus_result.total_votes} votes using {consensus_result.consensus_method}",
+                    "confidence_score": consensus_result.confidence_score
+                }
+            }
             
         except Exception as e:
             logger.error(f"Error in conversation {conversation_id}: {e}")

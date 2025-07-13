@@ -43,16 +43,22 @@ export interface ChatRequest {
   };
 }
 
+export interface AgentResponse {
+  agent_id: string;
+  content: string;
+  status?: 'thinking' | 'ready' | 'error';
+  error?: string;
+}
+
 export interface ChatResponse {
   conversation_id: string;
   message_id: string;
-  response: string;
-  agent_id?: string;
-  metadata?: {
-    response_time: number;
-    model: string;
-    temperature: number;
+  agent_responses: AgentResponse[];
+  consensus: {
+    content: string;
+    explanation?: string;
   };
+  metadata?: any;
 }
 
 export interface SystemHealth {

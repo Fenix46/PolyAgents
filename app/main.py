@@ -276,16 +276,33 @@ async def chat_endpoint(
         # Generate a unique message ID
         message_id = f"msg-{int(time.time())}-{conversation_id}"
         
-        return ChatResponse(
-            conversation_id=conversation_id,
-            message_id=message_id,
-            response=final_answer,
-            metadata={
-                "status": "success",
-                "turns": turns,
-                "num_agents": num_agents
-            }
-        )
+        # Extract results from orchestrator response
+        if isinstance(final_answer, dict):
+            # New format with agent responses and consensus
+            return ChatResponse(
+                conversation_id=conversation_id,
+                message_id=message_id,
+                response=final_answer["final_answer"],
+                agent_responses=final_answer["agent_responses"],
+                consensus=final_answer["consensus"],
+                metadata={
+                    "status": "success",
+                    "turns": turns,
+                    "num_agents": num_agents
+                }
+            )
+        else:
+            # Fallback to old format for backward compatibility
+            return ChatResponse(
+                conversation_id=conversation_id,
+                message_id=message_id,
+                response=final_answer,
+                metadata={
+                    "status": "success",
+                    "turns": turns,
+                    "num_agents": num_agents
+                }
+            )
         
     except ValidationError:
         raise
