@@ -124,9 +124,18 @@ export const usePolyAgents = () => {
         timestamp: new Date().toISOString(),
       };
       
-      setMessages(prev => [...prev, userMessage]);
+      // Add agent response to the list
+      const agentMessage: Message = {
+        id: response.message_id,
+        conversation_id: response.conversation_id,
+        type: 'consensus',
+        content: response.response,
+        timestamp: new Date().toISOString(),
+        metadata: response.metadata,
+      };
       
-      // The agent response will come through WebSocket
+      setMessages(prev => [...prev, userMessage, agentMessage]);
+      
       return response;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');

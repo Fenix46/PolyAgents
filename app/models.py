@@ -42,12 +42,15 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     user_id: Optional[str] = None
     stream: bool = False
+    agents: Optional[Dict[str, Any]] = None
 
 class ChatResponse(BaseModel):
     """Response model for the /chat endpoint."""
     conversation_id: str
+    message_id: str
     response: str
-    consensus_result: ConsensusResult
+    agent_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class ConversationListResponse(BaseModel):
     """Response for listing recent conversations."""

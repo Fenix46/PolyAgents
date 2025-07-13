@@ -31,6 +31,8 @@ services:
       - LOG_LEVEL=DEBUG
       - API_KEY_ENABLED=false
       - RATE_LIMITING_ENABLED=false
+      - GEMINI_MODEL=gemini-2.5-flash
+      - AGENT_MODELS_CONFIG=[{"agent_id":"agent_0","model":"gemini-1.5-flash","temperature":0.5},{"agent_id":"agent_1","model":"gemini-2.0-flash","temperature":0.8},{"agent_id":"agent_2","model":"gemini-2.5-flash","temperature":0.4}]
     depends_on:
       redis:
         condition: service_healthy

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
 
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
         
         # Initialize orchestrator
         orchestrator = Orchestrator(redis_bus, postgres_log, qdrant_store)
+        await orchestrator.initialize()
         logger.info("Orchestrator initialized")
         
         # Initialize WebSocket manager
@@ -252,19 +254,38 @@ async def chat_endpoint(
         # Use retry logic for the chat operation
         async def run_chat():
             return await orchestrator.run_conversation(
-                message=request.message,
-                conversation_id=request.conversation_id,
-                num_agents=request.num_agents or settings.num_agents,
-                turns=request.turns or settings.default_turns
+                prompt=request.message,
+                conversation_id=conversation_id,
+                n_turns=turns
             )
         
-        response = await error_handler.execute_with_retry(
+        # Extract agent configuration from request
+        agent_config = request.agents or {}
+        num_agents = agent_config.get('count', settings.num_agents)
+        turns = agent_config.get('turns', settings.default_turns)
+        
+        # Generate conversation_id if not provided
+        conversation_id = request.conversation_id or f"conv-{int(time.time())}"
+        
+        final_answer = await error_handler.execute_with_retry(
             run_chat,
             "chat_conversation",
             circuit_breaker_name="gemini_api"
         )
         
-        return response
+        # Generate a unique message ID
+        message_id = f"msg-{int(time.time())}-{conversation_id}"
+        
+        return ChatResponse(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            response=final_answer,
+            metadata={
+                "status": "success",
+                "turns": turns,
+                "num_agents": num_agents
+            }
+        )
         
     except ValidationError:
         raise
@@ -274,8 +295,8 @@ async def chat_endpoint(
         # Graceful degradation - return minimal response
         return ChatResponse(
             conversation_id=request.conversation_id or "error",
-            agent_responses=[],
-            consensus_result="Service temporarily unavailable",
+            message_id=f"error-{int(time.time())}",
+            response="Service temporarily unavailable",
             metadata={
                 "status": "error",
                 "message": "Chat service is temporarily unavailable",
@@ -300,11 +321,15 @@ async def start_streaming_conversation(
     try:
         # Start conversation in background
         async def run_streaming_chat():
+            # Extract agent configuration from request
+            agent_config = request.agents or {}
+            num_agents = agent_config.get('count', settings.num_agents)
+            turns = agent_config.get('turns', settings.default_turns)
+            
             await orchestrator.run_conversation_with_streaming(
-                message=request.message,
+                prompt=request.message,
                 conversation_id=conversation_id,
-                num_agents=request.num_agents or settings.num_agents,
-                turns=request.turns or settings.default_turns
+                n_turns=turns
             )
         
         asyncio.create_task(run_streaming_chat())
