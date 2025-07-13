@@ -153,8 +153,11 @@ class Orchestrator:
                 if msg.turn == n_turns and msg.sender.startswith("agent_")
             ]
             
+            # Add the original user prompt to the messages for context
+            consensus_messages = [initial_msg] + final_turn_messages
+            
             consensus_result = await self.consensus_engine.reach_consensus(
-                final_turn_messages
+                consensus_messages
             )
             
             # Log consensus result
@@ -308,8 +311,11 @@ class Orchestrator:
                 if msg.turn == n_turns and msg.sender.startswith("agent_")
             ]
             
+            # Add the original user prompt to the messages for context
+            consensus_messages = [initial_msg] + final_turn_messages
+            
             consensus_result = await self.consensus_engine.reach_consensus(
-                final_turn_messages
+                consensus_messages
             )
             
             # Log consensus result

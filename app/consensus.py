@@ -1,6 +1,7 @@
 """Consensus engine for reaching agreement among agents."""
 
 import logging
+import asyncio
 from typing import List, Dict, Counter
 from collections import Counter
 
@@ -10,6 +11,7 @@ from sklearn.metrics import pairwise_distances_argmin_min
 import numpy as np
 
 from .models import Message, ConsensusResult
+from .agent import Agent  # Importiamo Agent per usare il LLM
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +177,7 @@ class ConsensusEngine:
 
     async def _synthesis_consensus(self, messages: List[Message]) -> ConsensusResult:
         """
-        Synthesis consensus that combines the best ideas from all agents.
+        Synthesis consensus that combines the best ideas from all agents using LLM.
         This method creates a comprehensive response that incorporates insights from all agents.
         """
         if len(messages) == 1:
@@ -189,9 +191,12 @@ class ConsensusEngine:
         # Create a synthesis prompt
         synthesis_prompt = self._create_synthesis_prompt(messages)
         
-        # For now, we'll use a simple synthesis approach
-        # In a full implementation, you might call an LLM here
-        synthesized_response = self._simple_synthesis(messages)
+        # Use LLM to create synthesis
+        try:
+            synthesized_response = await self._llm_synthesis(synthesis_prompt)
+        except Exception as e:
+            logger.warning(f"LLM synthesis failed, falling back to simple synthesis: {e}")
+            synthesized_response = self._simple_synthesis(messages)
         
         logger.info(f"Synthesis consensus created from {len(messages)} agent responses")
         
@@ -205,25 +210,51 @@ class ConsensusEngine:
     
     def _create_synthesis_prompt(self, messages: List[Message]) -> str:
         """Create a prompt for synthesizing agent responses."""
+        # Extract the original user prompt from the conversation
+        user_prompt = self._extract_user_prompt(messages)
+        
         prompt_parts = [
             "You are a consensus synthesizer. Your task is to create a comprehensive response that combines the best insights from multiple AI agents.",
-            "\nAgent responses to synthesize:"
+            f"\n**Original User Question:** {user_prompt}",
+            "\n**Agent responses to synthesize:"
         ]
         
         for i, msg in enumerate(messages):
-            prompt_parts.append(f"\nAgent {msg.sender}: {msg.content}")
+            agent_name = msg.sender.replace("agent_", "Agent ")
+            prompt_parts.append(f"\n**{agent_name}:**")
+            prompt_parts.append(msg.content)
         
         prompt_parts.extend([
-            "\nInstructions:",
-            "1. Identify the key insights and unique perspectives from each agent",
-            "2. Combine complementary ideas and resolve conflicts",
-            "3. Create a comprehensive response that incorporates the best elements from all agents",
-            "4. Maintain clarity and coherence in the final response",
-            "5. Acknowledge the contributions of different perspectives",
-            "\nSynthesized response:"
+            "\n**Your Task:**",
+            "1. **Directly answer the user's original question** using insights from all agents",
+            "2. **Identify and combine the best ideas** from each agent's perspective",
+            "3. **Create a comprehensive, well-structured response** that addresses all aspects of the question",
+            "4. **Maintain depth and detail** while creating a coherent narrative",
+            "5. **Provide actionable insights** and practical recommendations",
+            "6. **Acknowledge different perspectives** but create a unified response",
+            "7. **Be thorough and complete** - this should be a substantial response",
+            "\n**Important:** Your response should be a complete answer to the user's question, not just a summary of what the agents said. Synthesize their insights into a coherent, actionable response.",
+            "\n**Synthesized Response:**"
         ])
         
         return "\n".join(prompt_parts)
+    
+    def _extract_user_prompt(self, messages: List[Message]) -> str:
+        """Extract the original user prompt from the conversation."""
+        # Look for the user message (usually the first message in the conversation)
+        for msg in messages:
+            if msg.sender == "user":
+                return msg.content
+        
+        # If no user message in the provided messages, try to get it from the conversation context
+        # This might happen if we only pass agent responses to consensus
+        if messages and hasattr(messages[0], 'conversation_id'):
+            # We could potentially fetch the conversation history here
+            # For now, return a generic message
+            return "User's original question about the topic discussed"
+        
+        # Fallback if no user message found
+        return "User's original question"
     
     def _simple_synthesis(self, messages: List[Message]) -> str:
         """Simple synthesis that combines key points from all agents."""
@@ -257,6 +288,39 @@ class ConsensusEngine:
         ])
         
         return "\n".join(synthesis_parts)
+
+    async def _llm_synthesis(self, prompt: str) -> str:
+        """Use LLM to create intelligent synthesis of agent responses."""
+        try:
+            # Create a temporary consensus agent with a mock Redis bus
+            class MockRedisBus:
+                async def send_message(self, *args, **kwargs):
+                    pass
+                async def get_messages(self, *args, **kwargs):
+                    return []
+            
+            consensus_agent = Agent(
+                agent_id="consensus_synthesizer",
+                model="gemini-pro",  # Use the same model as other agents
+                redis_bus=MockRedisBus(),  # Mock Redis bus
+                personality="""You are a consensus synthesizer. Your role is to:
+- Analyze multiple AI agent responses to a user's question
+- Identify the key insights and unique perspectives from each agent
+- Combine complementary ideas and resolve conflicts intelligently
+- Create a comprehensive, well-structured response that directly answers the user's original question
+- Maintain the depth and detail of the original responses while creating a coherent narrative
+- Focus on actionable insights and practical recommendations
+- Be thorough and complete in your synthesis""",
+                temperature=0.3  # Lower temperature for more focused synthesis
+            )
+            
+            # Call the LLM
+            response = await consensus_agent.call_gemini(prompt, "gemini-pro")
+            return response.strip()
+            
+        except Exception as e:
+            logger.error(f"Error in LLM synthesis: {e}")
+            raise
 
     async def _old_semantic_consensus(self, messages: List[Message]) -> ConsensusResult:
         """
