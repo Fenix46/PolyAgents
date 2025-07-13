@@ -20,6 +20,7 @@ const Index = () => {
     systemHealth,
     systemStats,
     isLoading,
+    processingStatus,
     error,
     loadConversation,
     sendMessage,
@@ -101,6 +102,7 @@ const Index = () => {
           onSendMessage={handleSendMessage}
           onOpenAgentSettings={handleOpenAgentSettings}
           isLoading={isLoading}
+          processingStatus={processingStatus}
           error={error}
         />
         

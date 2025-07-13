@@ -7,7 +7,7 @@ class APIService {
     this.config = {
       baseUrl: config?.baseUrl || import.meta.env.VITE_API_BASE_URL || '/api',
       apiKey: config?.apiKey || import.meta.env.VITE_API_KEY || '',
-      timeout: config?.timeout || 30000,
+      timeout: config?.timeout || 120000, // Aumentato a 2 minuti per risposte più lunghe
       retryAttempts: config?.retryAttempts || 3,
     };
   }

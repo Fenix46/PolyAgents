@@ -26,6 +26,7 @@ export const usePolyAgents = () => {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [systemStats, setSystemStats] = useState<SystemStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   // WebSocket event handlers
@@ -113,8 +114,8 @@ export const usePolyAgents = () => {
   // Send message
   const sendMessage = useCallback(async (request: ChatRequest) => {
     try {
-      console.log('🚀 Starting sendMessage with request:', request);
       setIsLoading(true);
+      setProcessingStatus('Initializing agents...');
       setError(null);
       setConsensus(null);
       
@@ -125,7 +126,6 @@ export const usePolyAgents = () => {
         content: '',
         status: 'thinking' as const,
       }));
-      console.log('🤔 Setting thinking agents:', thinkingAgents);
       setAgentResponses(thinkingAgents);
       
       // Mostra subito il messaggio utente
@@ -136,14 +136,13 @@ export const usePolyAgents = () => {
         content: request.message,
         timestamp: new Date().toISOString(),
       };
-      console.log('👤 Adding user message:', userMessage);
       setMessages(prev => [...prev, userMessage]);
       
       // Chiamata API
-      console.log('📡 Making API call...');
+      setProcessingStatus('Agents are analyzing your request...');
       const response: ChatResponse = await apiService.chat(request);
-      console.log('📥 API Response received:', response);
-      console.log('🤖 Agent responses from API:', response.agent_responses);
+      
+      setProcessingStatus('Processing agent responses...');
       
       // Aggiorna risposte agenti con defensive programming
       if (response.agent_responses && Array.isArray(response.agent_responses)) {
@@ -151,16 +150,14 @@ export const usePolyAgents = () => {
           ...r,
           status: (r.error ? 'error' : 'ready') as 'error' | 'ready',
         }));
-        console.log('✅ Updating agent responses:', updatedAgents);
         setAgentResponses(updatedAgents);
       } else {
-        console.warn('⚠️ No agent_responses in response:', response);
         setAgentResponses([]);
       }
       
       // Aggiorna consensus con defensive programming
       if (response.consensus && response.consensus.content) {
-        console.log('🎯 Setting consensus:', response.consensus);
+        setProcessingStatus('Generating consensus...');
         setConsensus(response.consensus);
         
         // Aggiungi la risposta consensus come messaggio
@@ -172,18 +169,16 @@ export const usePolyAgents = () => {
           timestamp: new Date().toISOString(),
           metadata: response.metadata,
         };
-        console.log('💬 Adding consensus message:', consensusMessage);
         setMessages(prev => [...prev, consensusMessage]);
       } else {
-        console.warn('⚠️ No consensus in response:', response);
         setConsensus(null);
       }
       
-      console.log('✅ sendMessage completed successfully');
+      setProcessingStatus('');
       return response;
     } catch (err) {
-      console.error('❌ Error in sendMessage:', err);
       setError(err instanceof Error ? err.message : 'Failed to send message');
+      setProcessingStatus('');
       throw err;
     } finally {
       setIsLoading(false);
@@ -247,6 +242,7 @@ export const usePolyAgents = () => {
     systemStats,
     isLoading,
     error,
+    processingStatus,
     
     // Actions
     loadConversations,

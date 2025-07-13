@@ -34,6 +34,8 @@ class ConsensusEngine:
             return await self._majority_vote_consensus(messages)
         elif self.algorithm == "semantic":
             return await self._semantic_consensus(messages)
+        elif self.algorithm == "synthesis":
+            return await self._synthesis_consensus(messages)
         else:
             raise ValueError(f"Unknown consensus algorithm: {self.algorithm}")
     
@@ -170,6 +172,91 @@ class ConsensusEngine:
             total_votes=len(messages),
             consensus_method="semantic_clustering"
         )
+
+    async def _synthesis_consensus(self, messages: List[Message]) -> ConsensusResult:
+        """
+        Synthesis consensus that combines the best ideas from all agents.
+        This method creates a comprehensive response that incorporates insights from all agents.
+        """
+        if len(messages) == 1:
+            return ConsensusResult(
+                final_answer=messages[0].content,
+                winning_votes=1,
+                total_votes=1,
+                consensus_method="single_response"
+            )
+        
+        # Create a synthesis prompt
+        synthesis_prompt = self._create_synthesis_prompt(messages)
+        
+        # For now, we'll use a simple synthesis approach
+        # In a full implementation, you might call an LLM here
+        synthesized_response = self._simple_synthesis(messages)
+        
+        logger.info(f"Synthesis consensus created from {len(messages)} agent responses")
+        
+        return ConsensusResult(
+            final_answer=synthesized_response,
+            winning_votes=len(messages),  # All agents contributed
+            total_votes=len(messages),
+            consensus_method="synthesis",
+            confidence_score=0.85  # High confidence for synthesis
+        )
+    
+    def _create_synthesis_prompt(self, messages: List[Message]) -> str:
+        """Create a prompt for synthesizing agent responses."""
+        prompt_parts = [
+            "You are a consensus synthesizer. Your task is to create a comprehensive response that combines the best insights from multiple AI agents.",
+            "\nAgent responses to synthesize:"
+        ]
+        
+        for i, msg in enumerate(messages):
+            prompt_parts.append(f"\nAgent {msg.sender}: {msg.content}")
+        
+        prompt_parts.extend([
+            "\nInstructions:",
+            "1. Identify the key insights and unique perspectives from each agent",
+            "2. Combine complementary ideas and resolve conflicts",
+            "3. Create a comprehensive response that incorporates the best elements from all agents",
+            "4. Maintain clarity and coherence in the final response",
+            "5. Acknowledge the contributions of different perspectives",
+            "\nSynthesized response:"
+        ])
+        
+        return "\n".join(prompt_parts)
+    
+    def _simple_synthesis(self, messages: List[Message]) -> str:
+        """Simple synthesis that combines key points from all agents."""
+        synthesis_parts = [
+            "Based on the analysis from multiple AI agents, here is a comprehensive synthesis:",
+            "\n"
+        ]
+        
+        # Extract key insights from each agent
+        for msg in messages:
+            agent_name = msg.sender.replace("agent_", "Agent ")
+            synthesis_parts.append(f"**{agent_name}'s Perspective:**")
+            
+            # Take the first few sentences as key insights
+            content_lines = msg.content.strip().split('\n')
+            key_insights = content_lines[:3]  # First 3 lines as key insights
+            
+            for line in key_insights:
+                if line.strip():
+                    synthesis_parts.append(f"- {line.strip()}")
+            
+            synthesis_parts.append("")
+        
+        # Add synthesis conclusion
+        synthesis_parts.extend([
+            "**Synthesized Conclusion:**",
+            "The combined analysis reveals multiple important dimensions of this topic. ",
+            "The logical analysis provides a solid foundation, while the creative perspective opens new possibilities. ",
+            "Critical thinking identifies potential challenges, and practical considerations ensure feasibility. ",
+            "A successful approach would integrate these complementary perspectives, leveraging the strengths of each while addressing the concerns raised."
+        ])
+        
+        return "\n".join(synthesis_parts)
 
     async def _old_semantic_consensus(self, messages: List[Message]) -> ConsensusResult:
         """

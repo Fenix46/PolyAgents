@@ -14,11 +14,19 @@ import {
   Users,
   AlertCircle,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Maximize2,
+  X
 } from 'lucide-react';
 import { Message, AgentResponse } from '@/types';
 import { cn } from '@/lib/utils';
 import React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface MessageBubbleProps {
   message: Message;
@@ -27,34 +35,93 @@ interface MessageBubbleProps {
 }
 
 export const AgentBubble: React.FC<AgentResponse & { index: number }> = ({ agent_id, content, status, error, index }) => {
+  const [showFullResponse, setShowFullResponse] = useState(false);
+  
   // Defensive programming: return null if required props are missing
   if (!agent_id || !status) {
     console.warn('AgentBubble received invalid props:', { agent_id, status });
     return null;
   }
 
+  const agentName = agent_id.replace('agent_', 'Agent ');
+
   return (
-    <div className="flex items-start gap-2 mb-2">
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-agent-${(index % 5) + 1} text-white font-bold text-lg`}>
-        {index + 1}
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">Agent {index + 1}</span>
-          {status === 'thinking' && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="animate-spin w-3 h-3" /> thinking...</span>
-          )}
-          {status === 'error' && (
-            <span className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> error</span>
-          )}
+    <>
+      <div className="flex items-start gap-2 mb-2">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-agent-${(index % 5) + 1} text-white font-bold text-lg`}>
+          {index + 1}
         </div>
-        <div className="mt-1 text-sm whitespace-pre-line">
-          {status === 'ready' && content}
-          {status === 'error' && <span className="italic">{error}</span>}
-          {status === 'thinking' && <span className="italic text-muted-foreground">...</span>}
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">{agentName}</span>
+            {status === 'thinking' && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="animate-spin w-3 h-3" /> thinking...</span>
+            )}
+            {status === 'error' && (
+              <span className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> error</span>
+            )}
+            {status === 'ready' && content && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFullResponse(true)}
+                className="h-6 w-6 p-0 ml-auto"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
+          <div className="mt-1 text-sm whitespace-pre-line">
+            {status === 'ready' && content && (
+              <div className="max-h-32 overflow-hidden relative">
+                {content}
+                {content.length > 200 && (
+                  <div className="absolute bottom-0 right-0 bg-gradient-to-l from-background to-transparent w-8 h-6" />
+                )}
+              </div>
+            )}
+            {status === 'error' && <span className="italic">{error}</span>}
+            {status === 'thinking' && <span className="italic text-muted-foreground">...</span>}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Full Response Modal */}
+      <Dialog open={showFullResponse} onOpenChange={setShowFullResponse}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center bg-agent-${(index % 5) + 1} text-white font-bold text-sm`}>
+                {index + 1}
+              </div>
+              {agentName} - Complete Response
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none prose-invert">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                code: ({ children, className }) => (
+                  <code className={cn(
+                    "bg-surface rounded px-1 py-0.5 text-sm font-mono",
+                    className
+                  )}>
+                    {children}
+                  </code>
+                ),
+                pre: ({ children }) => (
+                  <pre className="bg-surface rounded p-3 overflow-x-auto">
+                    {children}
+                  </pre>
+                ),
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     # Agent Settings
     num_agents: int = Field(default=3, description="Number of agents to spawn")
     default_turns: int = Field(default=2, description="Default conversation turns")
-    consensus_algorithm: str = Field(default="semantic", description="Consensus algorithm (semantic or majority_vote)")
+    consensus_algorithm: str = Field(default="synthesis", description="Consensus algorithm (synthesis, semantic, or majority_vote)")
     
     # Gemini Settings - Default fallback
     gemini_api_key: Optional[str] = Field(default=None, description="Gemini API key")
     gemini_model: str = Field(default="gemini-pro", description="Default Gemini model name")
     gemini_temperature: float = Field(default=0.7, description="Default Gemini temperature")
-    gemini_max_tokens: int = Field(default=1000, description="Gemini max tokens")
+    gemini_max_tokens: int = Field(default=4000, description="Gemini max tokens")
     
     # Multi-Model Configuration (JSON string)
     agent_models_config: Optional[str] = Field(

@@ -9,7 +9,8 @@ import {
   VolumeX, 
   RotateCcw,
   Download,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
@@ -23,6 +24,7 @@ interface ChatInterfaceProps {
   consensus?: { content: string; explanation?: string } | null;
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
+  processingStatus?: string;
   error?: string | null;
   typingAgents?: Set<string>;
   autoScroll?: boolean;
@@ -41,6 +43,7 @@ export default function ChatInterface({
   consensus = null,
   onSendMessage,
   isLoading = false,
+  processingStatus = '',
   typingAgents = new Set(),
   autoScroll = true,
   onToggleAutoScroll,
@@ -55,15 +58,6 @@ export default function ChatInterface({
   const [showToolbar, setShowToolbar] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Debug logging
-  console.log('🎨 ChatInterface render:', {
-    messagesCount: messages.length,
-    agentResponsesCount: agentResponses.length,
-    agentResponses,
-    consensus,
-    isLoading
-  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -217,14 +211,12 @@ export default function ChatInterface({
                 ))}
                 {/* Risposte agenti (sotto l'ultimo messaggio utente) */}
                 {(() => {
-                  console.log('🔍 Rendering agent responses:', agentResponses);
                   return Array.isArray(agentResponses) && agentResponses.filter(Boolean).length > 0 && (
                     <div className="mt-4">
                       {agentResponses
                         .filter(Boolean)
                         .filter(agent => agent && agent.agent_id && agent.status)
                         .map((agent, idx) => {
-                          console.log(`🤖 Rendering agent ${idx}:`, agent);
                           return (
                             <AgentBubble 
                               key={agent.agent_id || `agent-${idx}`} 
@@ -238,7 +230,6 @@ export default function ChatInterface({
                 })()}
                 {/* Consensus (bubble separata, evidenziata) */}
                 {(() => {
-                  console.log('🎯 Rendering consensus:', consensus);
                   return consensus && (
                     <div className="mt-6">
                       <div className="flex items-start gap-2 mb-2">
@@ -290,6 +281,21 @@ export default function ChatInterface({
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {/* Processing Status */}
+            {processingStatus && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-center justify-center py-4"
+              >
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{processingStatus}</span>
+                </div>
+              </motion.div>
+            )}
 
             <div ref={messagesEndRef} />
           </div>
