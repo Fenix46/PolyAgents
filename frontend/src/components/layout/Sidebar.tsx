@@ -40,7 +40,7 @@ export default function Sidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-  const displayConversations = searchResults || conversations;
+  const displayConversations = (searchResults || conversations || []) as Conversation[];
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);

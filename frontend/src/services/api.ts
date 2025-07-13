@@ -18,13 +18,19 @@ class APIService {
   ): Promise<T> {
     const url = `${this.config.baseUrl}${endpoint}`;
     
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    
+    // Only add Authorization header if API key is provided
+    if (this.config.apiKey && this.config.apiKey.trim() !== '') {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+    
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.apiKey}`,
-        ...options.headers,
-      },
+      headers,
       signal: AbortSignal.timeout(this.config.timeout),
     });
 
@@ -43,18 +49,25 @@ class APIService {
   }
 
   async startStreaming(conversationId: string, request: ChatRequest): Promise<Response> {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Authorization header if API key is provided
+    if (this.config.apiKey && this.config.apiKey.trim() !== '') {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+    
     return fetch(`${this.config.baseUrl}/stream/${conversationId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.apiKey}`,
-      },
+      headers,
       body: JSON.stringify(request),
     });
   }
 
   async getRecentConversations(): Promise<Conversation[]> {
-    return this.makeRequest<Conversation[]>('/conversations/recent');
+    const response = await this.makeRequest<{ conversations: Conversation[] }>('/conversations/recent');
+    return response.conversations || [];
   }
 
   async getConversation(id: string): Promise<Conversation> {
@@ -62,10 +75,11 @@ class APIService {
   }
 
   async searchConversations(query: string): Promise<Conversation[]> {
-    return this.makeRequest<Conversation[]>('/conversations/search', {
+    const response = await this.makeRequest<{ results: Conversation[] }>('/conversations/search', {
       method: 'POST',
       body: JSON.stringify({ query }),
     });
+    return response.results || [];
   }
 
   async getSystemHealth(): Promise<SystemHealth> {
