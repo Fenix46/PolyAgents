@@ -1,7 +1,8 @@
 """Data models for the poly-agents system."""
 
 from datetime import datetime
-from typing import Optional, Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +14,7 @@ class Message(BaseModel):
     content: str
     turn: int
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class ConsensusResult(BaseModel):
@@ -22,7 +23,7 @@ class ConsensusResult(BaseModel):
     winning_votes: int
     total_votes: int
     consensus_method: str
-    confidence_score: Optional[float] = None
+    confidence_score: float | None = None
 
 
 class ConversationResult(BaseModel):
@@ -33,26 +34,26 @@ class ConversationResult(BaseModel):
     total_turns: int
     total_messages: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
 
 
 class ChatRequest(BaseModel):
     """Request model for the /chat endpoint."""
     message: str
-    conversation_id: Optional[str] = None
-    user_id: Optional[str] = None
+    conversation_id: str | None = None
+    user_id: str | None = None
     stream: bool = False
-    agents: Optional[Dict[str, Any]] = None
+    agents: dict[str, Any] | None = None
 
 class ChatResponse(BaseModel):
     """Response model for the /chat endpoint."""
     conversation_id: str
     message_id: str
     response: str  # Keep for backward compatibility
-    agent_id: Optional[str] = None
-    agent_responses: Optional[List[Dict[str, Any]]] = None  # Individual agent responses
-    consensus: Optional[Dict[str, Any]] = None  # Consensus result
-    metadata: Optional[Dict[str, Any]] = None
+    agent_id: str | None = None
+    agent_responses: list[dict[str, Any]] | None = None  # Individual agent responses
+    consensus: dict[str, Any] | None = None  # Consensus result
+    metadata: dict[str, Any] | None = None
 
 class ConversationListResponse(BaseModel):
     """Response for listing recent conversations."""
@@ -67,7 +68,7 @@ class AgentConfig(BaseModel):
     """Configuration for an individual agent."""
     agent_id: str
     model: str # Renamed from model_name to avoid pydantic conflict
-    personality: Optional[str] = None
+    personality: str | None = None
     temperature: float = 0.7
     max_tokens: int = 1000
 
@@ -79,4 +80,4 @@ class SystemHealth(BaseModel):
     postgres_connected: bool
     qdrant_connected: bool = False
     active_conversations: int
-    total_agents: int 
+    total_agents: int

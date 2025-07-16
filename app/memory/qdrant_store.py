@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional, List
+import os
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, VectorParams
+from transformers import AutoModel, AutoTokenizer, pipeline
 from sentence_transformers import SentenceTransformer
 
 from ..config import settings
@@ -21,15 +23,18 @@ class QdrantStore:
     """
 
     def __init__(self):
-        self.client: QdrantClient | None = None
+        self.client: Optional[QdrantClient] = None
         self.collection_name = "conversation_memory"
         self.connected = False
-        # Carica modello embedding una sola volta
+        # Carica modello embedding una sola volta, parametrico
         try:
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            token = os.getenv("HUGGINGFACE_TOKEN")
+            self.embedding_tokenizer = AutoTokenizer.from_pretrained(settings.local_llm_model, token=token)
+            self.embedding_model = AutoModel.from_pretrained(settings.local_llm_model, token=token)
+            self.embedding_pipe = pipeline("feature-extraction", model=self.embedding_model, tokenizer=self.embedding_tokenizer)
         except Exception as e:
             logger.error(f"Failed to load embedding model: {e}")
-            self.embedding_model = None
+            self.embedding_pipe = None
 
     async def initialize(self) -> None:
         """Initialize the Qdrant store (alias for connect)."""
@@ -176,18 +181,23 @@ class QdrantStore:
             logger.error(f"Error searching similar conversations: {e}")
             return []
 
-    async def generate_embedding(self, text: str) -> list[float]:
+    async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate embedding for text using SentenceTransformer.
+        Generate embedding for text using local LLM pipeline.
         """
-        if not self.embedding_model:
+        if not self.embedding_pipe:
             logger.error("Embedding model not loaded, returning dummy vector")
             return [0.0] * 384  # fallback size
         try:
-            # SentenceTransformer è sincrono, usiamo thread pool
             loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(None, self.embedding_model.encode, text)
-            return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+            embedding = await loop.run_in_executor(None, self.embedding_pipe, text)
+            # La pipeline feature-extraction restituisce [ [ [float] ] ], prendo il mean
+            import numpy as np
+            arr = np.array(embedding)
+            arr = arr.squeeze()
+            if arr.ndim == 2:
+                arr = arr.mean(axis=0)
+            return arr.tolist()
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
             return [0.0] * 384

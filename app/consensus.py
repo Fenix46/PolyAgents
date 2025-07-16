@@ -7,15 +7,30 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import os
 
 from .agent import Agent  # Importiamo Agent per usare il LLM
 from .models import ConsensusResult, Message
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
-# Load the sentence transformer model once
-# Using a lightweight model for performance
-transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
+# Caricamento modello locale parametrico
+_local_model = None
+_local_tokenizer = None
+_local_pipe = None
+
+def get_local_llm():
+    global _local_model, _local_tokenizer, _local_pipe
+    if _local_model is None or _local_tokenizer is None or _local_pipe is None:
+        token = os.getenv("HUGGINGFACE_TOKEN")
+        _local_tokenizer = AutoTokenizer.from_pretrained(settings.local_llm_model, token=token)
+        _local_model = AutoModelForCausalLM.from_pretrained(settings.local_llm_model, token=token)
+        _local_pipe = pipeline("text-generation", model=_local_model, tokenizer=_local_tokenizer)
+    return _local_pipe
+
+# Per embedding, se serve, si può usare pipeline("feature-extraction", ...)
 
 
 class ConsensusEngine:
@@ -180,7 +195,7 @@ class ConsensusEngine:
             )
 
         contents = [msg.content for msg in messages]
-        embeddings = transformer_model.encode(contents)
+        embeddings = get_local_llm().encode(contents)
 
         # Determine the optimal number of clusters (k)
         # We can't have more clusters than messages
@@ -223,10 +238,32 @@ class ConsensusEngine:
             consensus_method="semantic_clustering"
         )
 
+    def _summarize_with_local_llm(self, text: str) -> str:
+        """Usa Qwen3-0.6B (thinking) per riassumere una risposta cloud."""
+        pipe = get_local_llm()
+        prompt = (
+            "You are a thinking assistant. Summarize the following agent response in a concise, insightful way, highlighting the key points and reasoning steps.\n" + text
+        )
+        result = pipe(prompt, max_new_tokens=128, do_sample=False)
+        return result[0]["generated_text"].strip()
+
+    def _fuse_with_local_llm(self, summaries: list[str], user_prompt: str) -> str:
+        """Usa Qwen3-0.6B (thinking) per fondere i riassunti in una risposta unica e intelligente."""
+        pipe = get_local_llm()
+        prompt = (
+            "You are a thinking assistant. Given the original user question and the following agent summaries, synthesize a single, comprehensive answer that combines the best insights, resolves conflicts, and provides actionable recommendations.\n"
+            f"User question: {user_prompt}\n"
+            "Agent summaries:\n"
+        )
+        for i, summary in enumerate(summaries):
+            prompt += f"Agent {i+1}: {summary}\n"
+        prompt += "\nSynthesized answer:"
+        result = pipe(prompt, max_new_tokens=256, do_sample=False)
+        return result[0]["generated_text"].strip()
+
     async def _synthesis_consensus(self, messages: list[Message]) -> ConsensusResult:
         """
-        Synthesis consensus that combines the best ideas from all agents using LLM.
-        This method creates a comprehensive response that incorporates insights from all agents.
+        Synthesis consensus che usa Qwen3-0.6B locale (thinking) per riassumere e fondere le risposte cloud.
         """
         if len(messages) == 1:
             return ConsensusResult(
@@ -235,25 +272,24 @@ class ConsensusEngine:
                 total_votes=1,
                 consensus_method="single_response"
             )
-
-        # Create a synthesis prompt
-        synthesis_prompt = self._create_synthesis_prompt(messages)
-
-        # Use LLM to create synthesis
-        try:
-            synthesized_response = await self._llm_synthesis(synthesis_prompt)
-        except Exception as e:
-            logger.warning(f"LLM synthesis failed, falling back to simple synthesis: {e}")
-            synthesized_response = self._simple_synthesis(messages)
-
-        logger.info(f"Synthesis consensus created from {len(messages)} agent responses")
-
+        # Estrai prompt utente
+        user_prompt = self._extract_user_prompt(messages)
+        # Prendi solo le risposte degli agenti cloud (sender che inizia con 'agent_')
+        agent_responses = [msg for msg in messages if msg.sender.startswith("agent_")]
+        # Riassumi ogni risposta cloud con Qwen3-0.6B
+        summaries = []
+        for msg in agent_responses:
+            summary = self._summarize_with_local_llm(msg.content)
+            summaries.append(summary)
+        # Fusione intelligente dei riassunti
+        fused = self._fuse_with_local_llm(summaries, user_prompt)
+        logger.info(f"Local synthesis consensus created from {len(agent_responses)} agent responses")
         return ConsensusResult(
-            final_answer=synthesized_response,
-            winning_votes=len(messages),  # All agents contributed
+            final_answer=fused,
+            winning_votes=len(agent_responses),
             total_votes=len(messages),
-            consensus_method="synthesis",
-            confidence_score=0.85  # High confidence for synthesis
+            consensus_method="local_synthesis_qwen3-0.6b",
+            confidence_score=0.9
         )
 
     def _create_synthesis_prompt(self, messages: list[Message]) -> str:

@@ -10,13 +10,14 @@ Usage:
 """
 
 import asyncio
+import json
+import logging
+import os
+from uuid import uuid4
+
 import aiohttp
 import websockets
-import os
-import json
 from dotenv import load_dotenv
-from uuid import uuid4
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -71,7 +72,7 @@ class TerminalClient:
             async with websockets.connect(ws_url, additional_headers={"Authorization": f"Bearer {self.api_key}"}) as websocket:
                 # First, send the initial prompt via HTTP to start the process
                 await self._trigger_streaming_chat(prompt, conversation_id)
-                
+
                 # Then, listen for real-time updates
                 await self._listen_for_updates(websocket)
 
@@ -86,7 +87,7 @@ class TerminalClient:
         """Sends the initial HTTP POST request to start the streaming conversation."""
         url = f"{self.api_base_url}/stream/{conversation_id}"
         payload = {"message": prompt}
-        
+
         # This request is "fire-and-forget" from the client's perspective.
         # It triggers the backend to start processing and sending updates to the WebSocket.
         async def post_request():
@@ -108,7 +109,7 @@ class TerminalClient:
             try:
                 message_json = await websocket.recv()
                 message = json.loads(message_json)
-                
+
                 msg_type = message.get("type")
                 if msg_type == "message":
                     self._print_message(message.get("message", {}))
@@ -126,7 +127,7 @@ class TerminalClient:
             except websockets.exceptions.ConnectionClosed:
                 print("\nSYSTEM: WebSocket connection closed by server.")
                 break
-    
+
     def _print_message(self, msg: dict):
         """Formats and prints a regular message."""
         sender = msg.get('sender', 'unknown')
@@ -138,7 +139,7 @@ class TerminalClient:
             pass
         else:
             print(f"\n{sender.upper()}:\n{content}")
-            
+
     def _print_final_answer(self, msg: dict):
         """Formats and prints the final consensus answer."""
         content = msg.get('final_answer', 'No final answer was provided.')
@@ -156,7 +157,7 @@ async def main():
 
     api_host = os.getenv("API_HOST", "localhost")
     api_port = int(os.getenv("API_PORT", "8000"))
-    
+
     # Try to get one of the default API keys from the environment
     default_keys_json = os.getenv("DEFAULT_API_KEYS")
     api_key = None
@@ -182,4 +183,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nClient interrupted. Exiting.") 
+        print("\nClient interrupted. Exiting.")

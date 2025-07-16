@@ -1,1 +1,1 @@
-"""Poly-agents system with Gemini models.""" 
+"""Poly-agents system with Gemini models."""

@@ -4,28 +4,34 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Dict, Any, List, Optional
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .models import ChatRequest, ChatResponse, ConversationListResponse, MessageSearchRequest
-from .orchestrator import Orchestrator
-from .memory.redis_bus import RedisBus
+from .config import settings
+from .error_handling import (
+    AuthenticationError,
+    GracefulDegradation,
+    PolyAgentsError,
+    RateLimitError,
+    ValidationError,
+    error_handler,
+    handle_known_exceptions,
+)
+from .health import health_checker
 from .memory.postgres_log import PostgresLogger
 from .memory.qdrant_store import QdrantStore
+from .memory.redis_bus import RedisBus
+from .models import ChatRequest, ChatResponse, ConversationListResponse, MessageSearchRequest
+from .orchestrator import Orchestrator
+from .security import Permission, SecurityManager
 from .websocket import WebSocketConnectionManager
-from .config import settings
-from .security import SecurityManager, Permission
-from .health import health_checker
-from .error_handling import (
-    error_handler, PolyAgentsError, AuthenticationError, ValidationError,
-    RateLimitError, handle_known_exceptions, GracefulDegradation
-)
+from .consensus import get_local_llm
 
 # Configure logging
 logging.basicConfig(
@@ -35,36 +41,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global instances
-redis_bus: Optional[RedisBus] = None
-postgres_log: Optional[PostgresLogger] = None
-qdrant_store: Optional[QdrantStore] = None
-orchestrator: Optional[Orchestrator] = None
-websocket_manager: Optional[WebSocketConnectionManager] = None
-security_manager: Optional[SecurityManager] = None
+redis_bus: RedisBus | None = None
+postgres_log: PostgresLogger | None = None
+qdrant_store: QdrantStore | None = None
+orchestrator: Orchestrator | None = None
+websocket_manager: WebSocketConnectionManager | None = None
+security_manager: SecurityManager | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     global redis_bus, postgres_log, qdrant_store, orchestrator, websocket_manager, security_manager
-    
+
     logger.info("Starting PolyAgents application...")
-    
+
     try:
         # Initialize security manager
         security_manager = SecurityManager()
         await security_manager.initialize()
         logger.info("Security manager initialized")
-        
+
         # Initialize memory systems
         redis_bus = RedisBus()
         await redis_bus.initialize()
         logger.info("Redis bus initialized")
-        
+
         postgres_log = PostgresLogger()
         await postgres_log.connect()
         logger.info("PostgreSQL log initialized")
-        
+
         # Initialize optional Qdrant (graceful degradation if not available)
         try:
             qdrant_store = QdrantStore()
@@ -73,46 +79,46 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Qdrant not available, continuing without vector search: {e}")
             qdrant_store = None
-        
+
         # Initialize orchestrator
         orchestrator = Orchestrator(redis_bus, postgres_log, qdrant_store)
         await orchestrator.initialize()
         logger.info("Orchestrator initialized")
-        
+
         # Initialize WebSocket manager
         websocket_manager = WebSocketConnectionManager(redis_bus)
         await websocket_manager.initialize()
         logger.info("WebSocket manager initialized")
-        
+
         # Start background tasks
         asyncio.create_task(security_manager.start_background_tasks())
-        
+
         logger.info("PolyAgents application started successfully")
         yield
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
         raise
-    
+
     finally:
         logger.info("Shutting down PolyAgents application...")
-        
+
         # Cleanup in reverse order
         if websocket_manager:
             await websocket_manager.cleanup()
-        
+
         if redis_bus:
             await redis_bus.cleanup()
-        
+
         if postgres_log:
             await postgres_log.cleanup()
-        
+
         if qdrant_store:
             await qdrant_store.cleanup()
-        
+
         if security_manager:
             await security_manager.cleanup()
-        
+
         logger.info("Application shutdown complete")
 
 
@@ -147,31 +153,31 @@ if not settings.debug:
 async def verify_api_key(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Verify API key and check rate limits."""
     if not security_manager:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Security manager not initialized"
         )
-    
+
     try:
         # Check if API key authentication is enabled
         if not settings.api_key_enabled:
             return {"authenticated": False, "permissions": [Permission.READ.value, Permission.WRITE.value]}
-        
+
         if not credentials:
             raise AuthenticationError("API key required")
-        
+
         # Verify API key
         api_key_info = await security_manager.verify_api_key(credentials.credentials)
-        
+
         # Check rate limits
         client_id = api_key_info.get("client_id", "anonymous")
         await security_manager.check_rate_limit(client_id, request.client.host if request.client else "unknown")
-        
+
         return api_key_info
-        
+
     except AuthenticationError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
     except RateLimitError as e:
@@ -186,7 +192,7 @@ async def verify_api_key(
 async def polyagents_exception_handler(request: Request, exc: PolyAgentsError):
     """Handle PolyAgents custom exceptions."""
     error_type = type(exc).__name__
-    
+
     if isinstance(exc, AuthenticationError):
         status_code = status.HTTP_401_UNAUTHORIZED
     elif isinstance(exc, ValidationError):
@@ -195,7 +201,7 @@ async def polyagents_exception_handler(request: Request, exc: PolyAgentsError):
         status_code = status.HTTP_429_TOO_MANY_REQUESTS
     else:
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
@@ -210,7 +216,7 @@ async def polyagents_exception_handler(request: Request, exc: PolyAgentsError):
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions."""
     error_handler.log_error("global_exception", exc, {"path": str(request.url)})
-    
+
     if settings.debug:
         import traceback
         return JSONResponse(
@@ -237,7 +243,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @handle_known_exceptions("chat")
 async def chat_endpoint(
     request: ChatRequest,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ) -> ChatResponse:
     """Process a chat request with multiple agents and consensus."""
     if not orchestrator:
@@ -245,12 +251,12 @@ async def chat_endpoint(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service not available"
         )
-    
+
     try:
         # Validate input
         if not request.message.strip():
             raise ValidationError("Message cannot be empty")
-        
+
         # Use retry logic for the chat operation
         async def run_chat():
             return await orchestrator.run_conversation(
@@ -258,24 +264,24 @@ async def chat_endpoint(
                 conversation_id=conversation_id,
                 n_turns=turns
             )
-        
+
         # Extract agent configuration from request
         agent_config = request.agents or {}
         num_agents = agent_config.get('count', settings.num_agents)
         turns = agent_config.get('turns', settings.default_turns)
-        
+
         # Generate conversation_id if not provided
         conversation_id = request.conversation_id or f"conv-{int(time.time())}"
-        
+
         final_answer = await error_handler.execute_with_retry(
             run_chat,
             "chat_conversation",
             circuit_breaker_name="gemini_api"
         )
-        
+
         # Generate a unique message ID
         message_id = f"msg-{int(time.time())}-{conversation_id}"
-        
+
         # Extract results from orchestrator response
         if isinstance(final_answer, dict):
             # New format with agent responses and consensus
@@ -303,12 +309,12 @@ async def chat_endpoint(
                     "num_agents": num_agents
                 }
             )
-        
+
     except ValidationError:
         raise
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}")
-        
+
         # Graceful degradation - return minimal response
         return ChatResponse(
             conversation_id=request.conversation_id or "error",
@@ -326,7 +332,7 @@ async def chat_endpoint(
 async def start_streaming_conversation(
     conversation_id: str,
     request: ChatRequest,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ):
     """Start a streaming conversation and return connection info."""
     if not orchestrator or not websocket_manager:
@@ -334,7 +340,7 @@ async def start_streaming_conversation(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Streaming service not available"
         )
-    
+
     try:
         # Start conversation in background
         async def run_streaming_chat():
@@ -342,21 +348,21 @@ async def start_streaming_conversation(
             agent_config = request.agents or {}
             num_agents = agent_config.get('count', settings.num_agents)
             turns = agent_config.get('turns', settings.default_turns)
-            
+
             await orchestrator.run_conversation_with_streaming(
                 prompt=request.message,
                 conversation_id=conversation_id,
                 n_turns=turns
             )
-        
+
         asyncio.create_task(run_streaming_chat())
-        
+
         return {
             "conversation_id": conversation_id,
             "status": "started",
             "websocket_url": f"/ws/{conversation_id}"
         }
-        
+
     except Exception as e:
         logger.error(f"Streaming conversation error: {e}")
         raise HTTPException(
@@ -371,27 +377,27 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
     if not websocket_manager:
         await websocket.close(code=1013)
         return
-    
+
     try:
         # Add connection to manager
         await websocket_manager.connect(websocket, conversation_id)
-        
+
         # Keep connection alive and handle messages
         while True:
             try:
                 # Wait for messages with timeout
                 message = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-                
+
                 # Handle ping/pong for keep-alive
                 if message == "ping":
                     await websocket.send_text("pong")
-                
-            except asyncio.TimeoutError:
+
+            except TimeoutError:
                 # Send ping to check if connection is alive
                 await websocket.send_text("ping")
             except WebSocketDisconnect:
                 break
-                
+
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
@@ -401,16 +407,22 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
 @app.get("/health")
 async def basic_health_check():
     """Basic health check endpoint."""
-    return {"status": "healthy", "service": "polyagents"}
+    try:
+        # Prova a generare un prompt dummy per verificare che il modello sia caricato
+        pipe = get_local_llm()
+        _ = pipe("healthcheck", max_new_tokens=1, do_sample=False)
+        return {"status": "healthy", "service": "polyagents", "local_llm": "ready"}
+    except Exception as e:
+        return {"status": "unhealthy", "service": "polyagents", "local_llm": f"error: {str(e)}"}
 
 
 @app.get("/health/detailed")
-async def detailed_health_check(auth: Dict[str, Any] = Depends(verify_api_key)):
+async def detailed_health_check(auth: dict[str, Any] = Depends(verify_api_key)):
     """Detailed health check with component status."""
     try:
         component_healths = await health_checker.check_all_components(use_cache=True)
         return health_checker.format_health_response(component_healths)
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {
@@ -423,7 +435,7 @@ async def detailed_health_check(auth: Dict[str, Any] = Depends(verify_api_key)):
 @app.get("/conversations/recent")
 async def get_recent_conversations(
     limit: int = 10,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ) -> ConversationListResponse:
     """Get recent conversations."""
     if not postgres_log:
@@ -431,11 +443,11 @@ async def get_recent_conversations(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service not available"
         )
-    
+
     try:
         conversations = await postgres_log.get_recent_conversations(limit)
         return ConversationListResponse(conversations=conversations)
-        
+
     except Exception as e:
         logger.error(f"Get recent conversations error: {e}")
         # Graceful degradation
@@ -448,7 +460,7 @@ async def get_recent_conversations(
 @app.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ):
     """Get conversation details."""
     if not postgres_log:
@@ -456,17 +468,17 @@ async def get_conversation(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service not available"
         )
-    
+
     try:
         messages = await postgres_log.get_conversation_messages(conversation_id)
         if not messages:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        
+
         return {
             "conversation_id": conversation_id,
             "messages": messages
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -480,7 +492,7 @@ async def get_conversation(
 @app.post("/conversations/search")
 async def search_conversations(
     request: MessageSearchRequest,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ):
     """Search conversations by query."""
     if not postgres_log:
@@ -488,14 +500,14 @@ async def search_conversations(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service not available"
         )
-    
+
     try:
         results = await postgres_log.search_conversations(
             query=request.query,
             limit=request.limit or 10
         )
         return {"results": results, "query": request.query}
-        
+
     except Exception as e:
         logger.error(f"Search conversations error: {e}")
         return {
@@ -506,11 +518,11 @@ async def search_conversations(
 
 
 @app.get("/statistics")
-async def get_statistics(auth: Dict[str, Any] = Depends(verify_api_key)):
+async def get_statistics(auth: dict[str, Any] = Depends(verify_api_key)):
     """Get system statistics."""
     try:
         stats = {}
-        
+
         if postgres_log:
             try:
                 stats["conversations"] = await postgres_log.get_conversation_statistics()
@@ -518,14 +530,14 @@ async def get_statistics(auth: Dict[str, Any] = Depends(verify_api_key)):
             except Exception as e:
                 logger.warning(f"Failed to get database statistics: {e}")
                 stats["database"] = "unavailable"
-        
+
         if redis_bus:
             try:
                 stats["redis"] = await redis_bus.get_stream_info()
             except Exception as e:
                 logger.warning(f"Failed to get Redis statistics: {e}")
                 stats["redis"] = "unavailable"
-        
+
         # Add error statistics
         stats["errors"] = {}
         for operation, timestamps in error_handler.error_stats.items():
@@ -533,28 +545,28 @@ async def get_statistics(auth: Dict[str, Any] = Depends(verify_api_key)):
                 "total_24h": len(timestamps),
                 "rate_1h": error_handler.get_error_rate(operation, 1)
             }
-        
+
         # Add circuit breaker status
         stats["circuit_breakers"] = {}
         for name, breaker in error_handler.circuit_breakers.items():
             stats["circuit_breakers"][name] = breaker.get_status()
-        
+
         return stats
-        
+
     except Exception as e:
         logger.error(f"Statistics endpoint error: {e}")
         return GracefulDegradation.minimal_response("statistics", {"error": str(e)})
 
 
 @app.get("/redis/info")
-async def get_redis_info(auth: Dict[str, Any] = Depends(verify_api_key)):
+async def get_redis_info(auth: dict[str, Any] = Depends(verify_api_key)):
     """Get Redis stream information."""
     if not redis_bus:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Redis service not available"
         )
-    
+
     try:
         return await redis_bus.get_stream_info()
     except Exception as e:
@@ -565,7 +577,7 @@ async def get_redis_info(auth: Dict[str, Any] = Depends(verify_api_key)):
 @app.post("/admin/cleanup")
 async def cleanup_old_data(
     days: int = 30,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ):
     """Cleanup old data from all storage systems."""
     # Check admin permissions
@@ -574,30 +586,30 @@ async def cleanup_old_data(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin permissions required"
         )
-    
+
     cleanup_results = {}
-    
+
     try:
         if postgres_log:
             pg_result = await postgres_log.cleanup_old_data(days)
             cleanup_results["postgresql"] = pg_result
     except Exception as e:
         cleanup_results["postgresql"] = {"error": str(e)}
-    
+
     try:
         if redis_bus:
             redis_result = await redis_bus.cleanup_old_conversations(days)
             cleanup_results["redis"] = redis_result
     except Exception as e:
         cleanup_results["redis"] = {"error": str(e)}
-    
+
     try:
         if qdrant_store:
             # Qdrant cleanup would go here when implemented
             cleanup_results["qdrant"] = {"status": "not_implemented"}
     except Exception as e:
         cleanup_results["qdrant"] = {"error": str(e)}
-    
+
     return {
         "cleanup_results": cleanup_results,
         "days_threshold": days
@@ -608,7 +620,7 @@ async def cleanup_old_data(
 async def export_conversations(
     format: str = "json",
     days: int = 7,
-    auth: Dict[str, Any] = Depends(verify_api_key)
+    auth: dict[str, Any] = Depends(verify_api_key)
 ):
     """Export conversation data."""
     # Check admin permissions
@@ -617,13 +629,13 @@ async def export_conversations(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin permissions required"
         )
-    
+
     if not postgres_log:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service not available"
         )
-    
+
     try:
         if format.lower() == "json":
             data = await postgres_log.export_conversations(days, "json")
@@ -633,7 +645,7 @@ async def export_conversations(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only JSON format is currently supported"
             )
-            
+
     except Exception as e:
         logger.error(f"Export conversations error: {e}")
         raise HTTPException(
@@ -649,4 +661,4 @@ if __name__ == "__main__":
         port=settings.api_port,
         log_level=settings.log_level.lower(),
         reload=settings.debug
-    ) 
+    )
