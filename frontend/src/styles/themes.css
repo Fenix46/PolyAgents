@@ -1,0 +1,149 @@
+/* Temi personalizzati per PolyAgent */
+
+/* Tema chiaro */
+[data-theme="light"] {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
+}
+
+/* Tema scuro (default) */
+[data-theme="dark"] {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.5% 48%;
+  --radius: 0.5rem;
+}
+
+/* Tema ad alto contrasto */
+[data-theme="high-contrast"] {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 60 100% 50%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 80%;
+  --accent: 60 100% 50%;
+  --accent-foreground: 0 0% 0%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 30%;
+  --input: 0 0% 20%;
+  --ring: 60 100% 50%;
+  --radius: 0.25rem;
+}
+
+/* Layout configurabili */
+[data-layout="default"] {
+  --chat-font-size: 1rem;
+  --chat-line-height: 1.5;
+  --chat-padding: 1rem;
+  --sidebar-width: 280px;
+  --header-height: 64px;
+}
+
+[data-layout="compact"] {
+  --chat-font-size: 0.875rem;
+  --chat-line-height: 1.4;
+  --chat-padding: 0.75rem;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+}
+
+[data-layout="comfortable"] {
+  --chat-font-size: 1.125rem;
+  --chat-line-height: 1.6;
+  --chat-padding: 1.25rem;
+  --sidebar-width: 320px;
+  --header-height: 72px;
+}
+
+[data-layout="focused"] {
+  --chat-font-size: 1rem;
+  --chat-line-height: 1.5;
+  --chat-padding: 1rem;
+  --sidebar-width: 0px; /* Sidebar nascosta */
+  --header-height: 48px;
+}
+
+/* Impostazioni di accessibilità */
+.high-contrast {
+  --shadow-strength: 10%;
+  --shadow-color: 0 0% 0%;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.reduce-motion * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.screen-reader-enabled .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.keyboard-navigation:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.text-to-speech .tts-target {
+  position: relative;
+}
+
+.text-to-speech .tts-target::after {
+  content: '🔊';
+  position: absolute;
+  right: -1.5rem;
+  top: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}

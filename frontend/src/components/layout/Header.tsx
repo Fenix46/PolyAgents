@@ -13,6 +13,8 @@ import {
   User
 } from 'lucide-react';
 import { ConnectionStatus } from '@/types';
+import { ThemeSelector } from '@/components/ui/theme-selector';
+import { AccessibilityControls } from '@/components/accessibility/AccessibilityControls';
 
 interface HeaderProps {
   connectionStatus: ConnectionStatus;
@@ -118,6 +120,10 @@ export default function Header({
           </Badge>
         </motion.div>
 
+        <ThemeSelector />
+        
+        <AccessibilityControls />
+        
         <Button 
           variant="ghost" 
           size="icon"

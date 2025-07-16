@@ -17,6 +17,8 @@ import ChatInput from './ChatInput';
 import { Message, AgentResponse } from '@/types';
 import { cn } from '@/lib/utils';
 import { AgentBubble } from './MessageBubble';
+import { ConsensusVisualization } from '@/components/consensus/ConsensusVisualization';
+import { InteractiveFeedback } from '@/components/feedback/InteractiveFeedback';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -228,29 +230,46 @@ export default function ChatInterface({
                     </div>
                   );
                 })()}
-                {/* Consensus (bubble separata, evidenziata) */}
+                {/* Consensus Visualization */}
                 {(() => {
                   return consensus && (
-                    <div className="mt-6">
-                      <div className="flex items-start gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-blue-600 text-white font-bold text-lg">
-                          ★
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">Consensus</span>
+                    <>
+                      <div className="mt-6">
+                        <div className="flex items-start gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-blue-600 text-white font-bold text-lg">
+                            ★
                           </div>
-                          <div className="mt-1 text-base font-medium whitespace-pre-line bg-primary/10 rounded-lg p-3">
-                            {consensus.content}
-                          </div>
-                          {consensus.explanation && (
-                            <div className="mt-1 text-xs text-muted-foreground italic">
-                              {consensus.explanation}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">Consensus</span>
                             </div>
-                          )}
+                            <div className="mt-1 text-base font-medium whitespace-pre-line bg-primary/10 rounded-lg p-3">
+                              {consensus.content}
+                            </div>
+                            {consensus.explanation && (
+                              <div className="mt-1 text-xs text-muted-foreground italic">
+                                {consensus.explanation}
+                              </div>
+                            )}
+                            
+                            {/* Interactive Feedback */}
+                            <InteractiveFeedback 
+                              messageId={`consensus-${new Date().getTime()}`} 
+                              onSubmitFeedback={(messageId, feedback) => {
+                                console.log('Feedback submitted:', messageId, feedback);
+                                // Qui si implementerebbe la logica per inviare il feedback al backend
+                              }} 
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      
+                      {/* Detailed Consensus Visualization */}
+                      <ConsensusVisualization 
+                        agentResponses={agentResponses} 
+                        consensus={consensus} 
+                      />
+                    </>
                   );
                 })()}
               </>
