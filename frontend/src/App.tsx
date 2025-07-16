@@ -1,17 +1,27 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import Index from './pages/Index';
+import NotFound from './pages/NotFound';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { PerformanceMonitor } from './components/performance/PerformanceMonitor';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minuto
+      cacheTime: 5 * 60 * 1000, // 5 minuti
+      refetchOnWindowFocus: false,
+      retry: 1
+    }
+  }
+});
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
+  <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -22,9 +32,10 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <PerformanceMonitor enabled={true} sampleInterval={3000} />
       </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
