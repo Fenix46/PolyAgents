@@ -3,7 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import Index from './pages/Index';
+import ChatPage from './pages/ChatPage';
+import ConversationsPage from './pages/ConversationsPage';
+import StatisticsPage from './pages/StatisticsPage';
+import AdminPage from './pages/AdminPage';
 import NotFound from './pages/NotFound';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { PerformanceMonitor } from './components/performance/PerformanceMonitor';
@@ -19,6 +22,18 @@ const queryClient = new QueryClient({
   }
 });
 
+import Sidebar from './components/Sidebar';
+import { Outlet } from 'react-router-dom';
+
+const MainLayout: React.FC = () => (
+  <div className="flex h-screen w-screen bg-[#10121a] text-white">
+    <Sidebar />
+    <main className="flex-1 flex flex-col h-full">
+      <Outlet />
+    </main>
+  </div>
+);
+
 const App = () => (
   <ThemeProvider>
     <QueryClientProvider client={queryClient}>
@@ -27,9 +42,13 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<ChatPage />} />
+              <Route path="/conversations" element={<ConversationsPage />} />
+              <Route path="/statistics" element={<StatisticsPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Routes>
         </BrowserRouter>
         <PerformanceMonitor enabled={true} sampleInterval={3000} />

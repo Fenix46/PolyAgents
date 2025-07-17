@@ -114,6 +114,7 @@ export const usePolyAgents = () => {
   // Send message
   const sendMessage = useCallback(async (request: ChatRequest) => {
     try {
+      console.log('Starting sendMessage with request:', request);
       setIsLoading(true);
       setProcessingStatus('Initializing agents...');
       setError(null);
@@ -125,6 +126,7 @@ export const usePolyAgents = () => {
         agent_id: `agent_${i}`,
         content: '',
         status: 'thinking' as const,
+        message_id: `temp-${Date.now()}-${i}`,
       }));
       setAgentResponses(thinkingAgents);
       
@@ -136,11 +138,14 @@ export const usePolyAgents = () => {
         content: request.message,
         timestamp: new Date().toISOString(),
       };
+      console.log('Adding user message:', userMessage);
       setMessages(prev => [...prev, userMessage]);
       
       // Chiamata API
       setProcessingStatus('Agents are analyzing your request...');
+      console.log('Making API call to chat endpoint...');
       const response: ChatResponse = await apiService.chat(request);
+      console.log('API response received:', response);
       
       setProcessingStatus('Processing agent responses...');
       
@@ -150,8 +155,10 @@ export const usePolyAgents = () => {
           ...r,
           status: (r.error ? 'error' : 'ready') as 'error' | 'ready',
         }));
+        console.log('Updating agent responses:', updatedAgents);
         setAgentResponses(updatedAgents);
       } else {
+        console.log('No agent responses in response, clearing agents');
         setAgentResponses([]);
       }
       
@@ -162,23 +169,32 @@ export const usePolyAgents = () => {
         
         // Aggiungi la risposta consensus come messaggio
         const consensusMessage: Message = {
-          id: response.message_id,
-          conversation_id: response.conversation_id,
+          id: response.message_id || `consensus-${Date.now()}`,
+          conversation_id: response.conversation_id || request.conversation_id || '',
           type: 'consensus',
           content: response.consensus.content,
           timestamp: new Date().toISOString(),
           metadata: response.metadata,
         };
+        console.log('Adding consensus message:', consensusMessage);
         setMessages(prev => [...prev, consensusMessage]);
       } else {
+        console.log('No consensus in response');
         setConsensus(null);
       }
       
       setProcessingStatus('');
+      console.log('sendMessage completed successfully');
       return response;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      console.error('sendMessage failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      setError(errorMessage);
       setProcessingStatus('');
+      
+      // Rimuovi gli agenti "thinking" in caso di errore
+      setAgentResponses([]);
+      
       throw err;
     } finally {
       setIsLoading(false);
@@ -252,6 +268,7 @@ export const usePolyAgents = () => {
     disconnect,
     loadSystemHealth,
     loadSystemStats,
+    setError,
     
     // Services
     apiService,

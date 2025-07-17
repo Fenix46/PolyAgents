@@ -7,7 +7,7 @@ class APIService {
     this.config = {
       baseUrl: config?.baseUrl || import.meta.env.VITE_API_BASE_URL || '/api',
       apiKey: config?.apiKey || import.meta.env.VITE_API_KEY || '',
-      timeout: config?.timeout || 120000, // Aumentato a 2 minuti per risposte più lunghe
+      timeout: config?.timeout || 300000, // Aumentato a 5 minuti per risposte AI più lunghe
       retryAttempts: config?.retryAttempts || 3,
     };
   }
@@ -28,24 +28,48 @@ class APIService {
       headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
     
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      signal: AbortSignal.timeout(this.config.timeout),
-    });
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+      
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error(`Request timeout after ${this.config.timeout / 1000} seconds`);
+        }
+        throw error;
+      }
+      throw new Error('Unknown error occurred');
     }
-
-    return response.json();
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    return this.makeRequest<ChatResponse>('/chat', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    console.log('Sending chat request:', request);
+    try {
+      const response = await this.makeRequest<ChatResponse>('/chat', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      console.log('Chat response received:', response);
+      return response;
+    } catch (error) {
+      console.error('Chat request failed:', error);
+      throw error;
+    }
   }
 
   async startStreaming(conversationId: string, request: ChatRequest): Promise<Response> {

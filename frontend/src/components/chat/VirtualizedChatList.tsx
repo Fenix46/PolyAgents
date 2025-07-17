@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import MessageBubble from './MessageBubble';
 import { AgentBubble } from './MessageBubble';
 import { Message, AgentResponse } from '@/types';
@@ -20,79 +20,80 @@ export function VirtualizedChatList({
   isAtBottomRef,
   showMetadata = true
 }: VirtualizedChatListProps) {
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Quando i messaggi cambiano, se eravamo in fondo, scorriamo automaticamente in fondo
   useEffect(() => {
-    if (isAtBottomRef.current && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({
-        index: messages.length - 1,
-        behavior: 'smooth',
-      });
+    if (isAtBottomRef.current && scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTo({
+          top: scrollElement.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
     }
   }, [messages, isAtBottomRef]);
 
-  // Funzione per renderizzare un messaggio
-  const renderMessage = (index: number) => {
-    const message = messages[index];
-    
-    // Trova le risposte degli agenti correlate a questo messaggio (se presenti)
-    const relatedAgentResponses = agentResponses.filter(
-      response => response.message_id === message.id
-    );
-    
-    return (
-      <div className="py-2" key={message.id}>
-        <MessageBubble 
-          message={message} 
-          showMetadata={showMetadata}
-        />
-        
-        {/* Mostra le risposte degli agenti se presenti */}
-        {relatedAgentResponses.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {relatedAgentResponses.map((agent, idx) => (
-              <AgentBubble 
-                key={agent.agent_id || `agent-${idx}`} 
-                {...agent} 
-                index={idx} 
-              />
-            ))}
-          </div>
-        )}
-        
-        {/* Feedback interattivo per i messaggi dell'utente */}
-        {message.type === 'assistant' && (
-          <InteractiveFeedback 
-            messageId={message.id} 
-            onSubmitFeedback={onSubmitFeedback} 
-          />
-        )}
-      </div>
-    );
+  // Gestisce il cambio di stato "at bottom"
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLDivElement;
+    const isAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 10;
+    isAtBottomRef.current = isAtBottom;
   };
 
   return (
     <div className="flex-1 overflow-hidden">
-      <Virtuoso
-        ref={virtuosoRef}
-        style={{ height: '100%', width: '100%' }}
-        totalCount={messages.length}
-        itemContent={renderMessage}
-        overscan={200}
-        increaseViewportBy={{ top: 300, bottom: 300 }}
-        followOutput="auto"
-        atBottomStateChange={(isAtBottom) => {
-          isAtBottomRef.current = isAtBottom;
-        }}
-        components={{
-          EmptyPlaceholder: () => (
+      <ScrollArea 
+        ref={scrollAreaRef}
+        className="h-full w-full"
+        onScroll={handleScroll}
+      >
+        <div className="space-y-2 p-4">
+          {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               <p>Nessun messaggio. Inizia una conversazione!</p>
             </div>
-          ),
-        }}
-      />
+          ) : (
+            messages.map((message, index) => {
+              // Trova le risposte degli agenti correlate a questo messaggio (se presenti)
+              const relatedAgentResponses = agentResponses.filter(
+                response => response.message_id === message.id
+              );
+              
+              return (
+                <div className="py-2" key={message.id}>
+                  <MessageBubble 
+                    message={message} 
+                    showMetadata={showMetadata}
+                  />
+                  
+                  {/* Mostra le risposte degli agenti se presenti */}
+                  {relatedAgentResponses.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {relatedAgentResponses.map((agent, idx) => (
+                        <AgentBubble 
+                          key={agent.agent_id || `agent-${idx}`} 
+                          {...agent} 
+                          index={idx} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Feedback interattivo per i messaggi dell'utente */}
+                  {message.type === 'assistant' && (
+                    <InteractiveFeedback 
+                      messageId={message.id} 
+                      onSubmitFeedback={onSubmitFeedback} 
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

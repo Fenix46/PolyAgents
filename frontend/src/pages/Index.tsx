@@ -22,6 +22,7 @@ const Index = () => {
     isLoading,
     processingStatus,
     error,
+    setError,
     loadConversation,
     sendMessage,
     searchConversations,
@@ -43,9 +44,13 @@ const Index = () => {
     };
 
     try {
+      console.log('Index: Sending message:', request);
       await sendMessage(request);
+      console.log('Index: Message sent successfully');
     } catch (err) {
-      console.error('Failed to send message:', err);
+      console.error('Index: Failed to send message:', err);
+      // L'errore viene già gestito nell'hook usePolyAgents
+      // Qui possiamo aggiungere ulteriori azioni se necessario
     }
   };
 
@@ -95,16 +100,36 @@ const Index = () => {
           isLoading={isLoading}
         />
         
-        <ChatInterface
-          messages={messages}
-          agentResponses={agentResponses}
-          consensus={consensus}
-          onSendMessage={handleSendMessage}
-          onOpenAgentSettings={handleOpenAgentSettings}
-          isLoading={isLoading}
-          processingStatus={processingStatus}
-          error={error}
-        />
+        <div className="flex flex-col flex-1 relative">
+          {/* Error Display */}
+          {error && (
+            <div className="absolute top-0 left-0 right-0 z-50 bg-red-500 text-white p-3 text-center">
+              <p className="text-sm font-medium">Errore: {error}</p>
+              <button 
+                onClick={() => setError(null)} 
+                className="text-xs underline mt-1"
+              >
+                Chiudi
+              </button>
+            </div>
+          )}
+          
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="absolute top-0 left-0 right-0 z-40 bg-blue-500 text-white p-2 text-center">
+              <p className="text-sm font-medium">
+                {processingStatus || 'Caricamento...'}
+              </p>
+            </div>
+          )}
+          
+          <ChatInterface
+            messages={messages}
+            agentResponses={agentResponses}
+            onSendMessage={handleSendMessage}
+            onOpenAgentSettings={handleOpenAgentSettings}
+          />
+        </div>
         
         <AgentStatusPanel 
           agentCount={currentConversation?.agents?.length || 0}
