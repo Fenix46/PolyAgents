@@ -48,17 +48,50 @@ const ChatPage: React.FC = () => {
       // Questa chiamata può richiedere molto tempo, ma l'animazione "thinking" rimarrà attiva
       console.log('Avvio chiamata sincrona a sendChat');
       const res: ChatResponse = await sendChat(req);
-      console.log('Risposta ricevuta dal backend:', res);
+      console.log('Risposta ricevuta dal backend:', JSON.stringify(res, null, 2));
       
       // Disattiva animazione thinking solo dopo aver ricevuto la risposta
       setShowAgentThinking(false);
       
-      // Mostra risposte agenti
-      let agentMsgs = AGENT_NAMES.map((name, idx) => ({
+      // Estrai le risposte degli agenti in modo più robusto
+      // 1. Verifica se agent_responses è un oggetto o un array
+      let agentResponses: Array<{name: string, content: string}> = [];
+      
+      if (res.agent_responses) {
+        if (Array.isArray(res.agent_responses)) {
+          // Se è un array, lo usiamo direttamente
+          agentResponses = res.agent_responses.map((resp, idx) => ({
+            name: `Agent ${idx+1}`,
+            content: typeof resp === 'string' ? resp : JSON.stringify(resp)
+          }));
+        } else {
+          // Se è un oggetto, lo convertiamo in array per mantenere l'ordine
+          agentResponses = Object.entries(res.agent_responses).map(([name, content]) => ({
+            name,
+            content: typeof content === 'string' ? content : JSON.stringify(content)
+          }));
+        }
+      }
+      
+      // Garantisci che ci siano sempre 3 agenti, anche se vuoti
+      while (agentResponses.length < 3) {
+        agentResponses.push({
+          name: `Agent ${agentResponses.length + 1}`,
+          content: ''
+        });
+      }
+      
+      // Limita a 3 agenti se ce ne sono di più
+      if (agentResponses.length > 3) {
+        agentResponses = agentResponses.slice(0, 3);
+      }
+      
+      // Crea i messaggi degli agenti con l'ordine corretto
+      const agentMsgs = agentResponses.map((agent, idx) => ({
         id: `${res.message_id}-agent${idx}`,
-        sender: name,
-        content: res.agent_responses?.[name] || '',
-        agent: name,
+        sender: agent.name,
+        content: agent.content || '(Nessuna risposta)',
+        agent: agent.name,
         timestamp: new Date().toLocaleTimeString()
       }));
       
@@ -74,12 +107,32 @@ const ChatPage: React.FC = () => {
         // Dopo altro timeout, mostra risposta consenso
         setTimeout(() => {
           setShowConsensusThinking(false);
+          
+          // Usa res.consensus se disponibile, altrimenti res.response
+          // Rimuovi eventuali prompt interni che iniziano con "You are a thinking assistant"
+          let consensusContent = res.consensus || res.response || '';
+          
+          // Assicurati che consensusContent sia una stringa
+          if (typeof consensusContent !== 'string') {
+            consensusContent = JSON.stringify(consensusContent);
+          }
+          
+          // Rimuovi il prompt interno se presente
+          if (consensusContent.includes && consensusContent.includes('You are a thinking assistant')) {
+            const parts = consensusContent.split('You are a thinking assistant');
+            if (parts.length > 1) {
+              // Prendi la parte dopo il prompt
+              const afterPrompt = parts[1].split('\n').slice(1).join('\n').trim();
+              consensusContent = afterPrompt || consensusContent;
+            }
+          }
+          
           setMessages(prev => [
             ...prev,
             {
               id: `${res.message_id}-fusion`,
               sender: 'Fusione',
-              content: res.response,
+              content: consensusContent,
               fusion: true,
               timestamp: new Date().toLocaleTimeString()
             }
@@ -127,44 +180,150 @@ const ChatPage: React.FC = () => {
         </button>
       </header>
       {/* Area chat centrale */}
-      <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-2 py-4 gap-2 overflow-y-auto">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 py-4 gap-4 overflow-y-auto">
         {/* Messaggi chat bubble */}
-        {messages.map((msg, idx) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'Utente' ? 'justify-end' : 'justify-start'} w-full`}>
-            <div
-              className={`relative max-w-[80%] rounded-2xl px-4 py-2 mb-2 shadow-md ${msg.sender === 'Utente' ? 'bg-primary text-white' : msg.fusion ? 'bg-gradient-to-r from-blue-900 to-purple-800 text-white' : 'bg-[#23263a] text-white'} cursor-pointer group`}
-              onClick={() => msg.agent && setExpandedAgent(idx === expandedAgent ? null : idx)}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {msg.agent && <img src={`/avatars/agent${msg.agent.replace(/\D/g, '')}.svg`} alt="avatar" className="w-6 h-6 rounded-full" />}
-                {msg.fusion && <span className="text-xs font-semibold bg-purple-700 px-2 py-0.5 rounded">Consenso</span>}
-                {msg.agent && <span className="text-xs font-semibold bg-blue-700 px-2 py-0.5 rounded">Cloud Agent</span>}
-                <span className="text-xs text-gray-400 ml-2">{msg.timestamp}</span>
+        {messages.map((msg, idx) => {
+          // Se è un messaggio utente o di errore, mostralo normalmente
+          if (msg.sender === 'Utente' || msg.error) {
+            return (
+              <div key={msg.id} className={`flex ${msg.sender === 'Utente' ? 'justify-end' : 'justify-start'} w-full`}>
+                <div
+                  className={`relative max-w-[80%] rounded-2xl px-4 py-2 mb-2 shadow-md ${msg.sender === 'Utente' ? 'bg-primary text-white' : msg.error ? 'bg-red-700 text-white' : 'bg-[#23263a] text-white'}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {msg.error && <span className="text-xs font-semibold bg-red-900 px-2 py-0.5 rounded">Errore</span>}
+                    <span className="text-xs text-gray-400 ml-2">{msg.timestamp}</span>
+                  </div>
+                  <div className="whitespace-pre-line">
+                    {msg.content}
+                  </div>
+                </div>
               </div>
-              <div className="whitespace-pre-line">
-                {expandedAgent === idx ? (msg.content || <span className="italic text-gray-400">(Nessuna risposta)</span>) : (msg.content.length > 120 ? msg.content.slice(0, 120) + '…' : msg.content)}
+            );
+          }
+          
+          // Se è un messaggio di fusione (consenso), mostralo a tutta larghezza
+          if (msg.fusion) {
+            return (
+              <div key={msg.id} className="flex flex-col w-full mt-4">
+                <div className="text-center mb-2">
+                  <span className="text-xs font-semibold bg-purple-700 px-3 py-1 rounded-full text-white">Consenso Semantico</span>
+                </div>
+                <div
+                  className="relative w-full rounded-2xl px-4 py-3 mb-2 shadow-md bg-gradient-to-r from-blue-900 to-purple-800 text-white cursor-pointer"
+                  onClick={() => setExpandedAgent(idx === expandedAgent ? null : idx)}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center">
+                      <span className="text-sm font-semibold">Fusione</span>
+                      <span className="text-xs text-gray-300 ml-2">{msg.timestamp}</span>
+                    </div>
+                    {expandedAgent === idx ? (
+                      <span className="text-xs text-gray-300">Click per ridurre</span>
+                    ) : (
+                      <span className="text-xs text-gray-300">Click per espandere</span>
+                    )}
+                  </div>
+                  <div className="whitespace-pre-line text-sm">
+                    {expandedAgent === idx ? (
+                      msg.content || <span className="italic text-gray-400">(Nessuna risposta)</span>
+                    ) : (
+                      msg.content.length > 240 ? msg.content.slice(0, 240) + '…' : msg.content
+                    )}
+                  </div>
+                </div>
               </div>
-              {expandedAgent === idx && (
-                <div className="absolute top-1 right-2 text-xs text-gray-300">Click per ridurre</div>
-              )}
+            );
+          }
+          
+          // Raggruppa i messaggi degli agenti in un unico gruppo orizzontale
+          // Trova tutti i messaggi degli agenti che appartengono allo stesso gruppo (stesso message_id)
+          if (msg.agent && !messages.some(m => m.id.includes(msg.id.split('-agent')[0]) && m.id < msg.id)) {
+            // Questo è il primo agente di un gruppo, mostra tutti gli agenti orizzontalmente
+            const messageIdBase = msg.id.split('-agent')[0];
+            const agentMessages = messages.filter(m => m.id.includes(messageIdBase) && m.agent && !m.fusion);
+            
+            return (
+              <div key={`group-${messageIdBase}`} className="w-full mt-2">
+                <div className="text-center mb-2">
+                  <span className="text-xs font-semibold bg-blue-700 px-3 py-1 rounded-full text-white">Risposte Agenti</span>
+                </div>
+                <div className="flex flex-row gap-2 overflow-x-auto pb-2">
+                  {agentMessages.map((agentMsg, agentIdx) => (
+                    <div 
+                      key={agentMsg.id} 
+                      className="flex-1 min-w-[250px] max-w-[350px] rounded-2xl px-4 py-2 shadow-md bg-[#23263a] text-white cursor-pointer"
+                      onClick={() => setExpandedAgent(messages.indexOf(agentMsg) === expandedAgent ? null : messages.indexOf(agentMsg))}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <img 
+                          src={`/avatars/agent${agentMsg.agent.replace(/\D/g, '') || agentIdx+1}.svg`} 
+                          alt="avatar" 
+                          className="w-6 h-6 rounded-full" 
+                        />
+                        <span className="text-sm font-semibold">{agentMsg.agent}</span>
+                        <span className="text-xs text-gray-400 ml-auto">{agentMsg.timestamp}</span>
+                      </div>
+                      <div className="whitespace-pre-line text-sm">
+                        {messages.indexOf(agentMsg) === expandedAgent ? (
+                          agentMsg.content || <span className="italic text-gray-400">(Nessuna risposta)</span>
+                        ) : (
+                          agentMsg.content.length > 150 ? agentMsg.content.slice(0, 150) + '…' : agentMsg.content
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          } else if (msg.agent) {
+            // Questo è un agente che fa parte di un gruppo già mostrato, non mostrarlo di nuovo
+            return null;
+          }
+          
+          // Fallback per altri tipi di messaggi
+          return (
+            <div key={msg.id} className="flex justify-start w-full">
+              <div className="relative max-w-[80%] rounded-2xl px-4 py-2 mb-2 shadow-md bg-[#23263a] text-white">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-gray-400">{msg.timestamp}</span>
+                </div>
+                <div className="whitespace-pre-line">{msg.content}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+        
         {/* Loading agenti e consenso */}
-        {showAgentThinking && agentThinking.map((a, i) => (
-          <div key={i} className="flex justify-start w-full">
-            <div className="relative max-w-[80%] rounded-2xl px-4 py-2 mb-2 shadow-md bg-[#23263a] text-white flex items-center gap-2">
-              <img src={`/avatars/agent${i+1}.svg`} alt="avatar" className="w-6 h-6 rounded-full animate-pulse" />
-              <span className="text-xs font-semibold bg-blue-700 px-2 py-0.5 rounded">Cloud Agent</span>
-              <span className="ml-2 italic text-gray-400 animate-pulse">{a} sta pensando…</span>
+        {showAgentThinking && (
+          <div className="w-full mt-2">
+            <div className="text-center mb-2">
+              <span className="text-xs font-semibold bg-blue-700 px-3 py-1 rounded-full text-white">Agenti al lavoro</span>
+            </div>
+            <div className="flex flex-row gap-2 overflow-x-auto pb-2">
+              {agentThinking.map((a, i) => (
+                <div key={i} className="flex-1 min-w-[250px] max-w-[350px] rounded-2xl px-4 py-2 shadow-md bg-[#23263a] text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <img src={`/avatars/agent${i+1}.svg`} alt="avatar" className="w-6 h-6 rounded-full animate-pulse" />
+                    <span className="text-sm font-semibold">{a}</span>
+                  </div>
+                  <div className="italic text-gray-400 animate-pulse">L'agente sta analizzando il prompt...</div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        )}
+        
         {showConsensusThinking && (
-          <div className="flex justify-start w-full">
-            <div className="relative max-w-[80%] rounded-2xl px-4 py-2 mb-2 shadow-md bg-gradient-to-r from-blue-900 to-purple-800 text-white flex items-center gap-2">
-              <span className="text-xs font-semibold bg-purple-700 px-2 py-0.5 rounded">Consenso</span>
-              <span className="ml-2 italic text-gray-200 animate-pulse">L’agente del consenso sta generando il resoconto…</span>
+          <div className="flex flex-col w-full mt-4">
+            <div className="text-center mb-2">
+              <span className="text-xs font-semibold bg-purple-700 px-3 py-1 rounded-full text-white">Consenso in elaborazione</span>
+            </div>
+            <div className="relative w-full rounded-2xl px-4 py-3 mb-2 shadow-md bg-gradient-to-r from-blue-900 to-purple-800 text-white">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-sm font-semibold">Fusione</span>
+              </div>
+              <div className="italic text-gray-200 animate-pulse">L'agente del consenso sta generando il resoconto semantico...</div>
             </div>
           </div>
         )}
